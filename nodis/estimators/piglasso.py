@@ -303,7 +303,3 @@ class PIGLassoEstimator:
             raise RuntimeError("Call fit() before accessing precision_.")
         return self._stability
 
-    @property
-    def stability_(self) -> np.ndarray:
-        """Alias for precision_: stability scores for each edge."""
-        return self.precision_
