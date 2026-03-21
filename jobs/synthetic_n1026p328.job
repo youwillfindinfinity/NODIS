@@ -1,0 +1,49 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_n1026
+#SBATCH --output=logs/n1026_%A_%a.out
+#SBATCH --error=logs/n1026_%A_%a.err
+#SBATCH --time=01:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=65536M            # 64 GB — 4 GB/task for 16 parallel tasks
+#SBATCH --array=0-37            # 38 jobs × 16 tasks = 608 slots (covers 600)
+# Methods: desparsified, gglasso, glasso  (piglasso → separate job)
+# Grid:    4 topologies × 3 methods × 50 reps = 600 tasks
+#
+# Submit (rome partition recommended for memory-bandwidth-heavy workloads):
+#   sbatch --partition=rome jobs/synthetic_n1026p328.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+METHODS=("desparsified" "gglasso" "glasso")
+N_REPS=50
+TOTAL=600           # 4 × 3 × 50
+TASKS_PER_JOB=16
+
+mkdir -p "$HOME/NODIS/results/raw" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / (3 * N_REPS) ))
+    REM1=$(( FLAT % (3 * N_REPS) ))
+    MTH_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    TOPO=${TOPOS[$TOPO_IDX]}
+    METHOD=${METHODS[$MTH_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=n1026p328 method=${METHOD} rep=${REP}"
+
+    python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+        --topology "$TOPO"     \
+        --config   n1026p328   \
+        --method   "$METHOD"   \
+        --rep      "$REP"      \
+        --out      "$HOME/NODIS/results/raw/" &
+done
+
+wait    # all parallel tasks must finish before SLURM releases the allocation

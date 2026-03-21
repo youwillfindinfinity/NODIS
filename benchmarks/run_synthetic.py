@@ -24,9 +24,10 @@ import pandas as pd
 
 # n/p configurations matching SILGGM simulation study (Zhang et al. 2018)
 CONFIGS = {
-    "n100p50":  (100, 50),
-    "n237p78":  (237, 78),
-    "n513p164": (513, 164),
+    "n100p50":   (100, 50),
+    "n237p78":   (237, 78),
+    "n513p164":  (513, 164),
+    "n1026p328": (1026, 328),
 }
 
 
@@ -36,12 +37,17 @@ def main() -> None:
                         choices=["hub", "scale-free", "cluster", "random"])
     parser.add_argument("--config", required=True, choices=list(CONFIGS))
     parser.add_argument("--method", required=True,
-                        choices=["desparsified", "glasso", "gglasso", "silggm_r", "piglasso"])
+                        choices=["desparsified", "glasso", "gglasso", "silggm_r",
+                                 "piglasso", "piglasso_corr", "piglasso_oracle"])
     parser.add_argument("--rep", type=int, required=True)
     parser.add_argument("--out", default="results/raw/")
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--n-jobs", type=int, default=1,
                         help="Parallel workers for PIGLASSO subsampling loop.")
+    parser.add_argument("--prior-noise", type=float, default=0.2,
+                        help="Fraction of edge labels to flip for oracle prior (0–0.5).")
+    parser.add_argument("--prior-weight", type=float, default=0.5,
+                        help="Alpha in lambda_mask = 1 - alpha * prior.")
     args = parser.parse_args()
 
     out_dir = pathlib.Path(args.out)
@@ -108,6 +114,27 @@ def main() -> None:
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=args.n_jobs)
         est.fit(data.X)
+        adj = est.get_adjacency()
+        scores = est.precision_
+
+    elif args.method == "piglasso_corr":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        from nodis.estimators.prior_utils import build_corr_prior
+        prior = build_corr_prior(data.X, gamma=2.0)
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
+        est.fit(data.X, prior=prior)
+        adj = est.get_adjacency()
+        scores = est.precision_
+
+    elif args.method == "piglasso_oracle":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        from nodis.estimators.prior_utils import build_noisy_oracle_prior
+        adj_true_bin = (data.Omega != 0).astype(float)
+        np.fill_diagonal(adj_true_bin, 0)
+        prior = build_noisy_oracle_prior(adj_true_bin, noise=args.prior_noise,
+                                         seed=args.rep)
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
+        est.fit(data.X, prior=prior)
         adj = est.get_adjacency()
         scores = est.precision_
 

@@ -1,4 +1,3 @@
-README.md
 pyproject.toml
 nodis/__init__.py
 nodis/cli.py
@@ -9,17 +8,21 @@ nodis.egg-info/entry_points.txt
 nodis.egg-info/requires.txt
 nodis.egg-info/top_level.txt
 nodis/benchmark/__init__.py
+nodis/benchmark/diffusion_eval.py
 nodis/benchmark/evaluate.py
 nodis/benchmark/runner.py
 nodis/estimators/__init__.py
 nodis/estimators/_silggm_bridge.py
 nodis/estimators/desparsified.py
 nodis/estimators/glasso.py
+nodis/estimators/piglasso.py
 nodis/inference/__init__.py
 nodis/inference/confidence.py
 nodis/inference/fdr.py
 nodis/inference/pvalues.py
+nodis/inference/stars.py
 nodis/preprocess/__init__.py
+nodis/preprocess/anndata_compat.py
 nodis/preprocess/npn.py
 nodis/simulate/__init__.py
 nodis/simulate/generator.py

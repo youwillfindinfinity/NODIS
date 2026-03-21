@@ -1,0 +1,50 @@
+#!/bin/bash
+#SBATCH --job-name=pig_diff_n1026
+#SBATCH --output=logs/pig_diff_n1026_%A_%a.out
+#SBATCH --error=logs/pig_diff_n1026_%A_%a.err
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32768M            # 32 GB — 4 GB/task for 8 parallel tasks
+#SBATCH --array=0-24            # 25 jobs × 8 tasks = 200 (4 topos × 50 reps)
+# Method: piglasso — loads adj pickle from results/raw/ (no re-fitting)
+# Dependency: must run AFTER piglasso_n1026p328.job (job 21021373) completes
+#   so that adj pkl files are available in results/raw/.
+#
+# Submit (add dependency so scheduler waits for synthetic job):
+#   sbatch --partition=rome --dependency=afterok:21021373 jobs/piglasso_diff_n1026p328.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+N_REPS=50
+TOTAL=200           # 4 topologies × 50 reps
+TASKS_PER_JOB=${SLURM_CPUS_PER_TASK}   # = 8
+
+mkdir -p "$HOME/NODIS/results/diffusion" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / N_REPS ))
+    REP=$(( FLAT % N_REPS ))
+    TOPO=${TOPOS[$TOPO_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=n1026p328 method=piglasso rep=${REP}"
+
+    # --adj-dir points to where run_synthetic.py saved the pkl files;
+    # if the pickle exists the estimator is NOT re-fitted (saves ~2 h/rep).
+    python "$HOME/NODIS/benchmarks/run_diffusion.py" \
+        --topology "$TOPO"                      \
+        --config   n1026p328                    \
+        --method   piglasso                     \
+        --rep      "$REP"                       \
+        --delta    random                       \
+        --mode     both                         \
+        --adj-dir  "$HOME/NODIS/results/raw/"  \
+        --out      "$HOME/NODIS/results/diffusion/" &
+done
+
+wait
