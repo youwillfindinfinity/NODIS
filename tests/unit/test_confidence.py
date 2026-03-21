@@ -89,28 +89,42 @@ def test_ensemble_ci_diagonal_zero():
     np.testing.assert_array_equal(np.diag(upper), 0.0)
 
 
-@pytest.mark.slow
-def test_ensemble_ci_wider_than_asymptotic_for_most_edges():
-    """Ensemble CIs should be wider than asymptotic for >= 70% of off-diagonal entries.
 
-    Marked slow: uses n_splits=25 for stable SE estimates.
-    Ensemble CIs use a mean-of-subsamples estimand and empirical SE, so they
-    are expected to be wider than single-fit asymptotic CIs for most edges
-    at moderate n/p, but the threshold is conservative (70%) to avoid flakiness.
+def test_ensemble_ci_width_scales_with_n_splits():
+    """CI width should scale as 1/sqrt(K): quadrupling K halves width (approx).
+
+    ensemble_ci draws K independent subsamples each of size floor(subsample_frac*n).
+    With default subsample_frac=0.5 and n=400, each split gets 200 samples regardless
+    of K. CI width = 2 * z_crit * std(Omega_k) / sqrt(K), so:
+        width(K=4) / width(K=16) ≈ sqrt(16)/sqrt(4) = 2.0
+
+    The SD estimate from K=4 splits has high variance (chi-squared, df=3), so
+    we allow a wide tolerance [1.4, 3.0] around the expected ratio of 2.0.
+
+    Many edges in a hub graph are structural zeros; both K=4 and K=16 produce
+    zero width for them, so we restrict the ratio check to edges where K=4
+    gives a non-negligible width.
     """
-    X, _ = _hub_data()
-    est = DesparifiedGGM().fit(X)
-    a_lower, a_upper = est.confidence_intervals(alpha=0.05)
-    _, e_lower, e_upper = ensemble_ci(X, n_splits=25, seed=0, alpha=0.05)
-
-    a_width = a_upper - a_lower
-    e_width = e_upper - e_lower
+    X, _ = _hub_data(n=400, p=10, seed=42)
+    _, lo4, hi4 = ensemble_ci(X, n_splits=4, seed=0, alpha=0.05)
+    _, lo16, hi16 = ensemble_ci(X, n_splits=16, seed=0, alpha=0.05)
 
     p = X.shape[1]
     uidx = np.triu_indices(p, k=1)
-    frac_wider = np.mean(e_width[uidx] >= a_width[uidx] - 1e-10)
-    assert frac_wider >= 0.70, (
-        f"Expected ensemble CIs to be wider for >= 70% of edges; got {frac_wider:.1%}"
+    width4 = (hi4 - lo4)[uidx]
+    width16 = (hi16 - lo16)[uidx]
+
+    # Restrict to edges where K=4 already produces a non-zero CI width;
+    # structural zero edges have std=0 for both K and don't test the 1/sqrt(K) rule.
+    active = width4 > 1e-12
+    assert active.sum() >= 3, "Too few active edges to test scaling; check data seed."
+
+    # Expected ratio ≈ 2.0; [1.4, 3.0] absorbs finite-sample noise in SD estimates
+    ratios = width4[active] / np.maximum(width16[active], 1e-12)
+    median_ratio = float(np.median(ratios))
+    assert 1.4 <= median_ratio <= 3.0, (
+        f"Expected width ratio (K=4 / K=16) near 2.0 (1/sqrt(K) rule); got {median_ratio:.3f}. "
+        "This suggests SE is not divided by sqrt(K)."
     )
 
 

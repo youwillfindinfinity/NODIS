@@ -130,7 +130,7 @@ def ensemble_ci(
         )   # shape (n_splits, p, p)
 
     omega_ensemble = np.mean(omegas, axis=0)
-    se_ensemble = np.std(omegas, axis=0, ddof=1)
+    se_ensemble = np.std(omegas, axis=0, ddof=1) / np.sqrt(n_splits)
 
     z_crit = norm.ppf(1.0 - alpha / 2.0)
     lower = omega_ensemble - z_crit * se_ensemble
