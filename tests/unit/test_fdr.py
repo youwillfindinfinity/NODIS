@@ -43,28 +43,35 @@ def test_diagonal_zero():
 
 
 def test_bh_controls_fdr():
-    """Under the global null (uniform p-values), FDR must be controlled at alpha."""
-    rng = np.random.default_rng(123)
-    n_trials = 200
-    p = 30
+    """Monte Carlo FDR estimate under global null must be <= alpha.
+
+    BH guarantees E[FDP] <= alpha, NOT FDP <= alpha per trial.
+    Under the global null all rejections are false positives, so:
+      FDP_trial = 1.0 if any rejection else 0.0
+    The test checks the Monte Carlo mean over 200 trials.
+    """
+    rng = np.random.default_rng(0)
     alpha = 0.05
+    p = 30
+    n_trials = 200
     fdp_list = []
 
     for _ in range(n_trials):
-        pvals = rng.uniform(0, 1, (p, p))
+        # Global null: uniform p-values on [0, 1]
+        pvals = rng.uniform(size=(p, p))
         pvals = (pvals + pvals.T) / 2
         np.fill_diagonal(pvals, 1.0)
         adj = fdr_control(pvals, alpha=alpha, method="BH")
         uidx = np.triu_indices(p, k=1)
-        n_rejected = adj[uidx].sum()
-        if n_rejected > 0:
-            fdp_list.append(n_rejected / n_rejected)   # all are FP under global null
-        else:
-            fdp_list.append(0.0)
+        n_rejected = int(adj[uidx].sum())
+        # Under global null: every rejection is a FP → FDP = 1 if any, else 0
+        fdp_list.append(1.0 if n_rejected > 0 else 0.0)
 
-    # Under the global null, FDR = FDP ≤ alpha always for BH
-    assert all(fdp <= alpha + 1e-9 for fdp in fdp_list), (
-        "BH FDR control violated under global null."
+    mc_fdr = float(np.mean(fdp_list))
+    # Allow generous tolerance: E[FDP] <= alpha with high probability over 200 trials
+    assert mc_fdr <= alpha + 0.02, (
+        f"Monte Carlo FDR estimate {mc_fdr:.4f} exceeds alpha={alpha} + 0.02. "
+        "BH FDR control appears broken."
     )
 
 
