@@ -398,7 +398,7 @@ def build_figure(syn: pd.DataFrame, d5: pd.DataFrame,
             lambda v, _: f"{v:.2f}"))
         ax_E.axhline(0.0, color="grey", linestyle="--",
                      linewidth=0.8, alpha=0.6, label="Random baseline")
-        ax_E.text(0.98, 0.97, "0 = random,  1 = perfect",
+        ax_E.text(0.98, 0.97, "0 = null baseline,  1 = perfect  (negative = worse than null)",
                   transform=ax_E.transAxes, ha="right", va="top",
                   fontsize=6.5, color="grey", style="italic")
     elif not ser.empty and sergio_methods:
