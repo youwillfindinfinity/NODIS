@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use NODIS in your research, please cite it as below."
+type: software
+title: "NODIS: NOdewise De-sparsified Inference Statistics"
+version: 0.1.0
+date-released: "2026"
+license: MIT
+repository-code: "https://github.com/youwillfindinfinity/nodis"
+authors:
+  - family-names: Bumbuc
+    given-names: Roland
+    affiliation: "Amsterdam UMC, University of Amsterdam"
+    orcid: "https://orcid.org/0000-XXXX-XXXX-XXXX"
+abstract: >
+  NODIS is a Python-native package for edge-level statistical inference in
+  Gaussian Graphical Models, providing de-sparsified nodewise Lasso p-values,
+  confidence intervals, and FDR-controlled adjacency matrices for
+  high-dimensional gene co-expression network analysis.
+keywords:
+  - gaussian graphical models
+  - gene co-expression networks
+  - statistical inference
+  - de-sparsified lasso
+  - bioinformatics
+  - high-dimensional statistics
+preferred-citation:
+  type: article
+  journal: "Journal of Open Source Software"
+  authors:
+    - family-names: Bumbuc
+      given-names: Roland
+      affiliation: "Amsterdam UMC, University of Amsterdam"
+  title: "NODIS: NOdewise De-sparsified Inference Statistics for Gaussian Graphical Models in transcriptomics"
+  year: 2026

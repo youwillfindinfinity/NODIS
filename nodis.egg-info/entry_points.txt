@@ -1,0 +1,2 @@
+[console_scripts]
+nodis = nodis.cli:main

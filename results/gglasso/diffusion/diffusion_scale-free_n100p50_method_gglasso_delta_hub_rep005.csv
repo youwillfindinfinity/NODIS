@@ -1,0 +1,2 @@
+topology,config,method,rep,n,p,delta_mode,diffusion_spearman_mean,diffusion_spearman_min,diffusion_mae_mean,knockout_spearman,knockout_top10_recall,knockout_topk_recall,n_components_pred,diffusion_spearman_mean_null,knockout_spearman_null,diffusion_spearman_norm,knockout_spearman_norm,wall_seconds
+scale-free,n100p50,gglasso,5,100,50,hub,0.27904568159336496,0.17152872823019083,0.004032603636408049,0.5982713085234094,0.5,0.5,1,-0.031114799027016176,0.046876350540216084,0.30080111439876117,0.5785135625327475,5.018341192044318

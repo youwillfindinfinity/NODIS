@@ -1,0 +1,43 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_cleanup
+#SBATCH --output=logs/cleanup_%A_%a.out
+#SBATCH --error=logs/cleanup_%A_%a.err
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M
+#SBATCH --array=0-49
+# Partition: sbatch --partition=$SNELLIUS_PARTITION jobs/cleanup_array.job
+# Runs only missing result files for glasso + gglasso methods.
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+METHODS=("glasso" "gglasso")
+OUT="$HOME/NODIS/results/raw"
+
+mkdir -p "$OUT" "$HOME/NODIS/logs"
+
+# REP index = array task ID (0-49)
+REP=${SLURM_ARRAY_TASK_ID}
+
+for TOPO in "${TOPOS[@]}"; do
+    for CFG in "${CONFIGS[@]}"; do
+        for METHOD in "${METHODS[@]}"; do
+            OUTFILE="${OUT}/results_${TOPO}_${CFG}_method_${METHOD}_rep$(printf '%03d' ${REP}).csv"
+            if [[ ! -f "$OUTFILE" ]]; then
+                echo "Running: ${TOPO} ${CFG} ${METHOD} rep${REP}"
+                python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+                    --topology "$TOPO" \
+                    --config   "$CFG"  \
+                    --method   "$METHOD" \
+                    --rep      "$REP"  \
+                    --out      "$OUT/" &
+            fi
+        done
+    done
+done
+
+wait

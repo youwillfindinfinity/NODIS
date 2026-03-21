@@ -1,0 +1,2 @@
+aupr,auroc,f1,f1_opt,mcc,shd,precision,recall,tp,fp,tn,fn,topology,config,method,rep,n,p,wall_seconds
+0.8406917923641719,0.9446473029045643,0.4,0.8205128205128205,0.4969167229105866,15,1.0,0.25,5,0,1205,15,hub,n100p50,desparsified,26,100,50,0.19064908428117633

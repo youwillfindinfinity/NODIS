@@ -1,0 +1,2 @@
+aupr,auroc,f1,f1_opt,mcc,shd,precision,recall,tp,fp,tn,fn,topology,config,method,rep,n,p,beta,selected_threshold,n_subsamples,wall_seconds
+0.8245824688410255,0.9354723707664884,0.6818181818181819,0.8,0.6982168171648008,98,0.9545454545454546,0.5303030303030303,105,5,2800,93,cluster,n237p78,stars,20,237,78,0.05,0.5,20,20.51787242712453

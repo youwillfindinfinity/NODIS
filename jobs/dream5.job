@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_dream5
+#SBATCH --output=logs/dream5_%j.out
+#SBATCH --error=logs/dream5_%j.err
+#SBATCH --time=05:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M            # 16 × 1792 MiB — matches billing unit exactly
+# Partition is set at submission time: sbatch --partition=rome jobs/dream5.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+mkdir -p "$HOME/NODIS/results/dream5" "$HOME/NODIS/logs"
+
+# Run all 9 tasks (3 p-values × 3 methods) in parallel.
+# --n-jobs 2 limits GraphicalLassoCV to 2 parallel CV folds per instance,
+# so the 3 glasso tasks consume at most 6 CPUs combined; the remaining
+# 6 desparsified/gglasso tasks share the other 10 CPUs.
+for P in 200 500 1000; do
+    for METHOD in desparsified glasso gglasso; do
+        python "$HOME/NODIS/benchmarks/run_dream5.py" \
+            --data-dir "$HOME/NODIS/data/dream5" \
+            --network  1                           \
+            --p        "$P"                        \
+            --method   "$METHOD"                   \
+            --n-jobs   2                           \
+            --out      "$HOME/NODIS/results/dream5/" &
+    done
+done
+
+wait   # all 9 background tasks must finish before job exits

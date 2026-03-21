@@ -1,0 +1,2 @@
+topology,config,method,rep,n,p,delta_mode,diffusion_spearman_mean,diffusion_spearman_min,diffusion_mae_mean,knockout_spearman,knockout_top10_recall,knockout_topk_recall,n_components_pred,diffusion_spearman_mean_null,knockout_spearman_null,diffusion_spearman_norm,knockout_spearman_norm,wall_seconds
+random,n100p50,piglasso,44,100,50,random,0.192925034618398,-0.061897888001356274,0.029364247568032093,0.6368460228971978,0.8,0.8,1,0.15451063634793638,0.6477370406918807,0.04543451392993506,-0.03091729489831659,0.6091228481382132

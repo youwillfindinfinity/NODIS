@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_gglasso_d5_p1000
+#SBATCH --output=logs/gglasso_dream5_p1000_%j.out
+#SBATCH --error=logs/gglasso_dream5_p1000_%j.err
+#SBATCH --time=04:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=16G
+# Partition is set at submission time: sbatch --partition=rome jobs/gglasso_dream5_p1000.job
+# Single task: gglasso, network 1, p=1000.
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+mkdir -p "$HOME/NODIS/results/dream5" "$HOME/NODIS/logs"
+
+python "$HOME/NODIS/benchmarks/run_dream5.py" \
+    --data-dir "$HOME/NODIS/data/dream5" \
+    --network  1                           \
+    --p        1000                        \
+    --method   gglasso                     \
+    --n-jobs   16                          \
+    --out      "$HOME/NODIS/results/dream5/"
