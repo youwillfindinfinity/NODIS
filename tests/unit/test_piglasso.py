@@ -67,8 +67,8 @@ def test_piglasso_stability_excludes_unconverged_runs(monkeypatch):
         est = PIGLassoEstimator(Q=3, n_lambda=3, pi_thr=0.6).fit(X)
 
     # The single converged run returned Theta=eye(p); after zeroing the diagonal,
-    # edge_mask is all zeros, so stability_ must be all-zero.
-    assert np.allclose(est.stability_, 0.0), (
+    # edge_mask is all zeros, so precision_ must be all-zero.
+    assert np.allclose(est.precision_, 0.0), (
         "Expected all-zero stability when every ADMM solve either fails convergence "
         "or produces a diagonal-only Theta (no off-diagonal edges selected)."
     )
