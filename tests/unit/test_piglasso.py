@@ -13,6 +13,7 @@ def _make_data(n=80, p=10, seed=0):
 
 def test_piglasso_fit_completes():
     """Smoke test: fit produces a stability matrix of the right shape."""
+    pytest.importorskip("gglasso", reason="gglasso not installed")
     from nodis.estimators.piglasso import PIGLassoEstimator
 
     X = _make_data()
@@ -65,7 +66,10 @@ def test_piglasso_stability_excludes_unconverged_runs(monkeypatch):
         warnings.simplefilter("ignore", RuntimeWarning)
         est = PIGLassoEstimator(Q=3, n_lambda=3, pi_thr=0.6).fit(X)
 
-    # stability_ should be all zeros or near-zero since almost no converged runs
-    # contributed edges (the single converged run was a diagonal-only Theta)
-    assert est.precision_.max() <= 1.0
+    # The single converged run returned Theta=eye(p); after zeroing the diagonal,
+    # edge_mask is all zeros, so stability_ must be all-zero.
+    assert np.allclose(est.stability_, 0.0), (
+        "Expected all-zero stability when every ADMM solve either fails convergence "
+        "or produces a diagonal-only Theta (no off-diagonal edges selected)."
+    )
     assert call_counts["total"] > 1
