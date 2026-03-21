@@ -38,7 +38,8 @@ def main() -> None:
     parser.add_argument("--config", required=True, choices=list(CONFIGS))
     parser.add_argument("--method", required=True,
                         choices=["desparsified", "glasso", "gglasso", "silggm_r",
-                                 "piglasso", "piglasso_corr", "piglasso_oracle"])
+                                 "piglasso", "piglasso_adaptive", "piglasso_corr",
+                                 "piglasso_oracle"])
     parser.add_argument("--rep", type=int, required=True)
     parser.add_argument("--out", default="results/raw/")
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -113,6 +114,13 @@ def main() -> None:
     elif args.method == "piglasso":
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=args.n_jobs)
+        est.fit(data.X)
+        adj = est.get_adjacency()
+        scores = est.precision_
+
+    elif args.method == "piglasso_adaptive":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, pi_thr="adaptive")
         est.fit(data.X)
         adj = est.get_adjacency()
         scores = est.precision_
