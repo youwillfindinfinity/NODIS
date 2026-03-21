@@ -1,0 +1,58 @@
+#!/bin/bash
+#SBATCH --job-name=pig_diff_all
+#SBATCH --output=logs/pig_diff_all_%A_%a.out
+#SBATCH --error=logs/pig_diff_all_%A_%a.err
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16384M            # 8 tasks × 2 GB (adj pkls loaded, no re-fitting)
+#SBATCH --array=0-74            # 75 jobs × 8 tasks = 600 slots
+# Piglasso diffusion with --delta all (fiedler, hub, random) for n100p50/n237p78/n513p164.
+# Uses --adj-dir to load pre-computed adj pkl files — no Lasso re-fitting.
+# Grid: 4 topologies × 3 configs × 50 reps = 600 tasks.
+#
+# Dependency: must run AFTER piglasso_synth_n513p164_missing.job so that
+# hub_n513p164 and scale-free_n513p164 pkl files exist.
+#
+# Submit (with dependency on synthetic job JOBID):
+#   sbatch --partition=rome --dependency=afterok:JOBID jobs/piglasso_diff_all_deltas.job
+# Or independently once pkls confirmed present:
+#   sbatch --partition=rome jobs/piglasso_diff_all_deltas.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+N_REPS=50
+TOTAL=600           # 4 × 3 × 50
+TASKS_PER_JOB=${SLURM_CPUS_PER_TASK}   # = 8
+
+mkdir -p "$HOME/NODIS/results/diffusion" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / (3 * N_REPS) ))
+    REM1=$(( FLAT % (3 * N_REPS) ))
+    CFG_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    TOPO=${TOPOS[$TOPO_IDX]}
+    CFG=${CONFIGS[$CFG_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=${CFG} method=piglasso rep=${REP}"
+
+    python "$HOME/NODIS/benchmarks/run_diffusion.py" \
+        --topology "$TOPO"                      \
+        --config   "$CFG"                       \
+        --method   piglasso                     \
+        --rep      "$REP"                       \
+        --delta    all                          \
+        --mode     both                         \
+        --adj-dir  "$HOME/NODIS/results/raw/"  \
+        --out      "$HOME/NODIS/results/diffusion/" &
+done
+
+wait

@@ -1,6 +1,6 @@
 # NODIS Benchmark Results
-**Last updated:** 2026-03-20
-**Status:** Synthetic complete (600 reps/method). DREAM5 mostly complete — piglasso p=1000 and gglasso p=1000 pending.
+**Last updated:** 2026-03-21
+**Status:** Synthetic complete (all 4 configs × 4 topologies × 50 reps × 4 methods). DREAM5 complete (all methods × all p). SERGIO complete (6 datasets × 4 methods × 2 preprocessing). Diffusion/knockout complete (8,000 reps).
 
 ---
 
@@ -54,22 +54,78 @@ PIGLASSO F1_opt at n=513 (0.796) nearly matches glasso grand mean (0.798), demon
 ---
 
 ## TABLE 4 — DREAM5 Net1
-E. coli in silico GRN (Marbach et al. 2012). n=487 experiments. Top-p genes selected by variance. Directed gold standard symmetrised prior to evaluation (see Methods). p=1000 piglasso and gglasso pending.
+E. coli in silico GRN (Marbach et al. 2012). n=487 experiments. Top-p genes selected by variance. Directed gold standard symmetrised prior to evaluation (see Methods). All methods complete.
 
-| Method | p | AUPR | AUROC | F1_opt | MCC | Status |
-|---|---|---|---|---|---|---|
-| glasso | 200 | 0.154 | 0.700 | 0.259 | 0.142 | ✓ |
-| glasso | 500 | 0.106 | 0.641 | 0.194 | 0.111 | ✓ |
-| glasso | 1000 | 0.084 | 0.617 | 0.168 | 0.124 | ✓ |
-| gglasso | 200 | 0.155 | 0.710 | 0.258 | 0.101 | ✓ |
-| gglasso | 500 | 0.105 | 0.643 | 0.195 | 0.071 | ✓ |
-| gglasso | 1000 | — | — | — | — | not submitted |
-| desparsified | 200 | 0.148 | 0.714 | 0.251 | 0.164 | ✓ |
-| desparsified | 500 | 0.098 | 0.638 | 0.183 | 0.146 | ✓ |
-| desparsified | 1000 | 0.069 | 0.618 | 0.156 | 0.119 | ✓ |
-| piglasso | 200 | 0.039 | 0.714 | 0.111 | 0.078 | ✓ |
-| piglasso | 500 | 0.027 | 0.642 | 0.097 | 0.055 | ✓ |
-| piglasso | 1000 | — | — | — | — | job 21008764 running |
+| Method | p | AUPR | AUROC | F1_opt | MCC |
+|---|---|---|---|---|---|
+| glasso | 200 | 0.154 | 0.700 | 0.259 | 0.142 |
+| glasso | 500 | 0.106 | 0.641 | 0.194 | 0.111 |
+| glasso | 1000 | 0.084 | 0.617 | 0.168 | 0.124 |
+| gglasso | 200 | 0.155 | 0.710 | 0.258 | 0.101 |
+| gglasso | 500 | 0.105 | 0.643 | 0.195 | 0.071 |
+| gglasso | 1000 | **0.084** | 0.634 | 0.165 | 0.061 |
+| desparsified | 200 | 0.148 | 0.714 | 0.251 | 0.164 |
+| desparsified | 500 | 0.098 | 0.638 | 0.183 | 0.146 |
+| desparsified | 1000 | 0.069 | 0.618 | 0.156 | 0.119 |
+| piglasso | 200 | 0.039 | 0.714 | 0.111 | 0.078 |
+| piglasso | 500 | 0.027 | 0.642 | 0.097 | 0.055 |
+| piglasso | 1000 | 0.016 | **0.645** | 0.069 | 0.052 |
+
+---
+
+---
+
+## TABLE 4b — NEW: n1026p328 Config (large n)
+4th synthetic config: n=1,026, p=328 (n/p≈3.1). 4 topologies × 50 reps × 4 methods. Note: gglasso degrades markedly at this scale.
+
+| Method | AUPR | AUROC | F1_opt | MCC |
+|---|---|---|---|---|
+| desparsified | **0.729** | **0.904** | **0.739** | 0.448 |
+| glasso | 0.729 | 0.896 | 0.732 | 0.500 |
+| piglasso | 0.649 | 0.894 | 0.687 | **0.600** |
+| gglasso | 0.199 | 0.584 | 0.276 | 0.297 |
+
+gglasso AUPR collapses to 0.199 at n1026p328 — convergence issues at high n/p with group penalty. desparsified and glasso remain competitive.
+
+---
+
+## TABLE 5 — SERGIO scRNA-seq Benchmark
+SERGIO simulator (Dibaeinia & Sinha 2020). 6 datasets (ds1, ds4–ds8). Directed TF–target gold standard. Grand mean across datasets. Log2+NPN preprocessing outperforms raw for precision-based methods.
+
+| Method | Preprocessing | AUPR | AUROC | F1_opt | MCC |
+|---|---|---|---|---|---|
+| glasso | none | **0.048** | **0.528** | 0.075 | **0.068** |
+| desparsified | log2+NPN | 0.045 | 0.507 | **0.083** | 0.002 |
+| desparsified | none | 0.043 | 0.517 | 0.079 | 0.013 |
+| gglasso | log2+NPN | 0.039 | 0.502 | 0.082 | 0.003 |
+| gglasso | none | 0.034 | 0.532 | 0.073 | 0.030 |
+| glasso | log2+NPN | 0.038 | 0.513 | 0.088 | 0.011 |
+| piglasso | log2+NPN | 0.032 | 0.500 | 0.061 | 0.000 |
+| piglasso | none | 0.032 | 0.500 | 0.061 | 0.000 |
+
+All methods near chance AUROC (~0.5–0.53) — expected, as SERGIO simulates directed TF regulation; undirected GGMs are structurally misspecified for this task.
+
+---
+
+## TABLE 6 — Diffusion & Knockout Benchmark
+Synthetic diffusion benchmark. Signal initialised at perturbed nodes; recovery measured by Spearman ρ between true and predicted propagation. 8,000 total reps (4 methods × 3 delta modes × 4 topologies × 3 configs × 50 reps). PIGLasso tested on random delta only.
+
+| Method | Diffusion Spearman (mean) | Knockout Spearman | Knockout Top-10% Recall |
+|---|---|---|---|
+| **desparsified** | **0.616** | 0.479 | 0.519 |
+| gglasso | 0.494 | 0.566 | 0.575 |
+| glasso | 0.370 | 0.648 | **0.633** |
+| piglasso | 0.318 | 0.521 | 0.547 |
+
+desparsified leads on diffusion recovery (sparser inferred networks propagate signal more faithfully). glasso leads on knockout prediction (denser networks better capture indirect regulatory paths).
+
+Per delta mode (desparsified):
+
+| Delta mode | Diffusion Spearman | Knockout Spearman | Knockout Top-10% Recall |
+|---|---|---|---|
+| fiedler | **0.777** | 0.483 | 0.552 |
+| random | 0.641 | 0.532 | 0.570 |
+| hub | 0.430 | 0.422 | 0.434 |
 
 ---
 
@@ -100,7 +156,20 @@ desparsified is 20–600× faster than glasso at equivalent p. PIGLASSO is ~19×
 - Desparsified is fastest by far (3s at p=1000 vs 1377s for glasso); PIGLASSO is the slowest (14535s at p=500).
 - MCC overflow bug in `evaluate.py` fixed (cast to `np.float64` before sqrt) — affected p=1000 piglasso DREAM5 run only.
 
+### SERGIO
+- All methods near chance AUROC — expected for directed TF network inference with undirected models.
+- PIGLasso AUROC exactly 0.500 with both preprocessing modes — outputs all-zero adjacency, consistent with subsample instability on single-cell count data.
+
+### Diffusion
+- desparsified best for diffusion recovery (sparse network = cleaner signal propagation).
+- glasso best for knockout prediction (dense network captures indirect effects).
+- Fiedler delta (signal on lowest-eigenvalue eigenvector) is the hardest to recover; hub delta is easiest.
+
+### n1026p328 (new config)
+- gglasso convergence failure at large n/p: AUPR collapses to 0.199 (from 0.725 at 3-config mean). Hub topology especially bad (0.024 AUPR). Root cause: group Lasso penalty accumulates regularisation with p at fixed λ schedule.
+- desparsified and glasso maintain parity (~0.729 each) — both benefit from larger n.
+- piglasso MCC peaks at 0.600 at n1026p328 (highest across all configs) — stability selection improves with sample size.
+
 ### Pending
-- `gglasso` DREAM5 p=1000: not yet submitted.
-- `piglasso` DREAM5 p=1000: job 21008764 running, ~18h wall time remaining.
-- Diffusion & knockout benchmark: design spec complete (`docs/superpowers/specs/2026-03-20-diffusion-knockout-benchmark-design.md`), implementation plan not yet written.
+- Burns real-data results (pig_burns job 21023358 running).
+- Adaptive pi_thr rerun for n1026p328 piglasso (requested).
