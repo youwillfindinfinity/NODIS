@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument("--data-dir", default="data/sergio")
     parser.add_argument("--dataset-id", type=int, default=4, choices=range(1, 12))
     parser.add_argument("--method", default="desparsified",
-                        choices=["desparsified", "glasso"])
+                        choices=["desparsified", "glasso", "gglasso", "piglasso"])
     parser.add_argument("--npn", action="store_true",
                         help="Apply log2(x+1) + NPN preprocessing.")
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -62,6 +62,18 @@ def main() -> None:
         est.fit(X)
         adj = est.get_adjacency()
         scores = np.abs(est.precision_)
+    elif args.method == "gglasso":
+        from nodis.estimators.glasso import GGLassoEstimator
+        est = GGLassoEstimator()
+        est.fit(X)
+        adj = est.get_adjacency()
+        scores = np.abs(est.precision_)
+    elif args.method == "piglasso":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        est = PIGLassoEstimator(n_jobs=1)
+        est.fit(X)
+        adj = est.get_adjacency()
+        scores = est.precision_
     wall = time.perf_counter() - t0
 
     out_dir = pathlib.Path(args.out)

@@ -37,7 +37,18 @@ class PIGLassoEstimator:
     n_lambda     : number of regularisation grid points
     lambda_lo    : lower regularisation bound
     lambda_hi    : upper regularisation bound
-    pi_thr       : stability threshold for adjacency call (default 0.5)
+    pi_thr       : stability threshold for adjacency call.  Pass a float in
+                   (0.5, 1.0) to use a fixed threshold, or the string
+                   "adaptive" to apply the Meinshausen & Bühlmann (2010)
+                   data-adaptive formula:
+                       pi_thr = 0.5 + q̄ / (2 * sqrt(max_edges * v_target))
+                   where q̄ is the mean number of edges selected per subsample
+                   (averaged over the lambda grid and all Q subsamples) and
+                   max_edges = p(p-1)/2.  The computed value is stored in
+                   pi_thr_adaptive_ after fit() is called.
+    v_target     : target PFER (expected number of false edges) used when
+                   pi_thr="adaptive".  Default 1.0.  Increase to be more
+                   permissive; decrease to be more conservative.
     prior_weight : alpha in mask = 1 - alpha * prior  (0 = no prior effect)
     n_jobs       : parallel joblib workers (1 = sequential)
     seed         : random seed
@@ -50,21 +61,30 @@ class PIGLassoEstimator:
         n_lambda: int = 20,
         lambda_lo: float = 0.05,
         lambda_hi: float = 0.30,
-        pi_thr: float = 0.5,
+        pi_thr: float | str = 0.5,
+        v_target: float = 1.0,
         prior_weight: float = 0.5,
         n_jobs: int = 1,
         seed: int = 42,
     ) -> None:
+        if isinstance(pi_thr, str) and pi_thr != "adaptive":
+            raise ValueError(f"pi_thr must be a float in (0.5, 1.0) or 'adaptive', got {pi_thr!r}")
+        if isinstance(pi_thr, float) and not (0.5 < pi_thr <= 1.0):
+            raise ValueError(f"Fixed pi_thr must be in (0.5, 1.0], got {pi_thr}")
+        if v_target <= 0:
+            raise ValueError(f"v_target must be positive, got {v_target}")
         self.Q = Q
         self.b_perc = b_perc
         self.n_lambda = n_lambda
         self.lambda_lo = lambda_lo
         self.lambda_hi = lambda_hi
         self.pi_thr = pi_thr
+        self.v_target = v_target
         self.prior_weight = prior_weight
         self.n_jobs = n_jobs
         self.seed = seed
         self._stability: np.ndarray | None = None
+        self.pi_thr_adaptive_: float | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -195,12 +215,45 @@ class PIGLassoEstimator:
         stability = freq.max(axis=2).astype(np.float64)
         np.fill_diagonal(stability, 0.0)
         self._stability = stability
+
+        # Adaptive pi_thr — Meinshausen & Bühlmann (2010) Corollary 1.
+        # q̄ = mean number of upper-triangle edges selected per (subsample, lambda) pair.
+        # pi_thr = 0.5 + q̄ / (2 * sqrt(max_edges * v_target))
+        # Clipped to [0.5 + ε, 0.9] to stay in a sensible operating range.
+        max_edges = p * (p - 1) / 2
+        # freq[i,j,l] = selection frequency for edge (i,j) at lambda index l.
+        # Mean over upper triangle and lambda gives q̄ per subsample slot.
+        triu = np.triu_indices(p, k=1)
+        q_bar = float(freq[triu[0], triu[1], :].mean()) * max_edges
+        pi_adaptive = 0.5 + q_bar / (2.0 * np.sqrt(max_edges * self.v_target))
+        pi_adaptive = float(np.clip(pi_adaptive, 0.501, 0.90))
+        self.pi_thr_adaptive_ = pi_adaptive
+
         return self
 
     def get_adjacency(self, threshold: float | None = None) -> np.ndarray:
+        """
+        Return binary adjacency matrix.
+
+        Parameters
+        ----------
+        threshold : float or None
+            Override the instance pi_thr for this call.  If None, uses
+            self.pi_thr; if self.pi_thr == "adaptive", uses the value
+            computed by fit() and stored in pi_thr_adaptive_.
+        """
         if self._stability is None:
             raise RuntimeError("Call fit() before get_adjacency().")
-        thr = self.pi_thr if threshold is None else threshold
+
+        if threshold is not None:
+            thr = float(threshold)
+        elif self.pi_thr == "adaptive":
+            if self.pi_thr_adaptive_ is None:
+                raise RuntimeError("Adaptive threshold not yet computed — call fit() first.")
+            thr = self.pi_thr_adaptive_
+        else:
+            thr = float(self.pi_thr)
+
         adj = (self._stability >= thr).astype(int)
         np.fill_diagonal(adj, 0)
         return adj

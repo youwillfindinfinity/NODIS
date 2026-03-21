@@ -1,0 +1,43 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_sergio2
+#SBATCH --output=logs/sergio2_%j.out
+#SBATCH --error=logs/sergio2_%j.err
+#SBATCH --time=08:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+# Partition is set at submission time: sbatch --partition=rome jobs/sergio_gglasso_piglasso.job
+# Adds gglasso and piglasso to the SERGIO benchmark (DS1, DS4-DS8, 100 genes).
+# 2 methods × 2 preprocessing × 6 datasets = 24 tasks, run sequentially.
+# Piglasso time estimate: ~5–10 min/dataset (p=100, n~300-3000, Q=200 subsamples).
+# GGLasso time estimate: ~1–2 min/dataset.
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+# Install PIGLasso into the active venv if not already present
+python -c "import piglasso" 2>/dev/null || \
+    pip install -e "$HOME/PIGLasso" --quiet
+
+mkdir -p "$HOME/NODIS/results/sergio" "$HOME/NODIS/logs"
+
+for DS in 1 4 5 6 7 8; do
+    for METHOD in gglasso piglasso; do
+        echo "[INFO] DS=${DS} method=${METHOD} preproc=none"
+        python "$HOME/NODIS/benchmarks/run_sergio.py" \
+            --data-dir   "$HOME/NODIS/data/sergio" \
+            --dataset-id "$DS"                      \
+            --method     "$METHOD"                  \
+            --out        "$HOME/NODIS/results/sergio/"
+
+        echo "[INFO] DS=${DS} method=${METHOD} preproc=log2+NPN"
+        python "$HOME/NODIS/benchmarks/run_sergio.py" \
+            --data-dir   "$HOME/NODIS/data/sergio" \
+            --dataset-id "$DS"                      \
+            --method     "$METHOD"                  \
+            --npn                                   \
+            --out        "$HOME/NODIS/results/sergio/"
+    done
+done
+
+echo "[INFO] Done."
