@@ -1,0 +1,58 @@
+#!/bin/bash
+#SBATCH --job-name=dream5_pig_prior
+#SBATCH --output=logs/dream5_pig_prior_%j.out
+#SBATCH --error=logs/dream5_pig_prior_%j.err
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=04:00:00
+# 6 tasks (p=200, 500, 1000 × piglasso_corr + piglasso_string) — sequential
+# sbatch --partition=rome jobs/dream5_piglasso_prior.job
+#
+# Note: piglasso_string requires prior_string_p{p}.npy files in results/dream5/.
+#       These are built by scripts/build_dream5_prior.py and must be synced
+#       to Snellius before this job runs.  Skipped automatically if not found.
+#
+# Note: DREAM5 AlternativeDataFormats uses anonymised gene names (G1…G1643)
+#       so piglasso_string will produce an empty prior (0 STRING edges) for
+#       any network in this data.  piglasso_corr is the primary target here.
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+mkdir -p "$HOME/NODIS/results/dream5" "$HOME/NODIS/logs"
+
+for P in 200 500 1000; do
+    # ---- piglasso_corr (correlation prior — works for any dataset) ----
+    OUTFILE="$HOME/NODIS/results/dream5/dream5_net1_p${P}_method_piglasso_corr.csv"
+    if [[ -f "$OUTFILE" ]]; then
+        echo "Skipping (exists): $OUTFILE"
+    else
+        echo "Running piglasso_corr p=${P} ..."
+        python "$HOME/NODIS/benchmarks/run_dream5.py" \
+            --p            "$P"                          \
+            --method       piglasso_corr                 \
+            --prior-weight 0.5                           \
+            --n-jobs       4                             \
+            --out          "$HOME/NODIS/results/dream5/"
+    fi
+
+    # ---- piglasso_string (STRING prior — skip if prior file absent) ----
+    PRIOR="$HOME/NODIS/results/dream5/prior_string_p${P}.npy"
+    OUTFILE="$HOME/NODIS/results/dream5/dream5_net1_p${P}_method_piglasso_string.csv"
+    if [[ -f "$OUTFILE" ]]; then
+        echo "Skipping (exists): $OUTFILE"
+    elif [[ ! -f "$PRIOR" ]]; then
+        echo "Skipping piglasso_string p=${P}: prior file not found ($PRIOR)"
+    else
+        echo "Running piglasso_string p=${P} ..."
+        python "$HOME/NODIS/benchmarks/run_dream5.py" \
+            --p            "$P"                          \
+            --method       piglasso_string               \
+            --prior-type   string                        \
+            --prior-dir    "$HOME/NODIS/results/dream5/" \
+            --prior-weight 0.5                           \
+            --n-jobs       4                             \
+            --out          "$HOME/NODIS/results/dream5/"
+    fi
+done

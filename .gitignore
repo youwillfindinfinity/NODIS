@@ -1,0 +1,100 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+# pip-installed editable package metadata (auto-generated)
+nodis.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Virtual environments ────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# ── Testing & coverage ──────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.coveragerc
+nosetests.xml
+pytest_cache/
+
+# ── Type checking ───────────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+.pytype/
+
+# ── Jupyter ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Secrets & environment ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.template
+*.pem
+*.key
+secrets.yaml
+secrets.json
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── Results & outputs ───────────────────────────────────────────────────────
+# Local results (re-generatable from benchmarks)
+results/
+# Raw Snellius HPC outputs (167 MB+)
+results_snellius_raw/
+# Keep figures tracked (only 468 KB)
+# figures/ is intentionally NOT ignored
+
+# ── Data ─────────────────────────────────────────────────────────────────────
+# Binary/large data files
+*.pkl
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.parquet
+*.feather
+# Compressed archives (STRING DB files, etc.)
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+# But keep small CSV/TSV data files (gold standards etc.) — not ignored
+
+# ── SLURM / HPC ──────────────────────────────────────────────────────────────
+slurm-*.out
+*.slurm.out
+logs/
+scratch/
+
+# ── Docs build ───────────────────────────────────────────────────────────────
+docs/_build/
+docs/api/
+site/
+
+# ── Sphinx ───────────────────────────────────────────────────────────────────
+_build/
+_static/
+_templates/

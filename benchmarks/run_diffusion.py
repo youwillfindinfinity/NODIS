@@ -27,9 +27,10 @@ import numpy as np
 import pandas as pd
 
 CONFIGS = {
-    "n100p50":  (100, 50),
-    "n237p78":  (237, 78),
-    "n513p164": (513, 164),
+    "n100p50":   (100, 50),
+    "n237p78":   (237, 78),
+    "n513p164":  (513, 164),
+    "n1026p328": (1026, 328),
 }
 
 # Uniform CSV schema — inactive mode columns are written as NaN

@@ -30,10 +30,17 @@ def main() -> None:
     parser.add_argument("--p", type=int, default=200,
                         help="Number of genes to retain (by variance).")
     parser.add_argument("--method", default="desparsified",
-                        choices=["desparsified", "glasso", "gglasso", "piglasso"])
+                        choices=["desparsified", "glasso", "gglasso",
+                                 "piglasso", "piglasso_corr", "piglasso_string"])
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--n-jobs", type=int, default=1,
                         help="Parallel CV jobs for SklearnGLasso (default 1).")
+    parser.add_argument("--prior-type", default="none", choices=["none", "string"],
+                        help="Prior type for piglasso_string method.")
+    parser.add_argument("--prior-dir", default="results/dream5/",
+                        help="Directory containing prior_string_p{p}.npy files.")
+    parser.add_argument("--prior-weight", type=float, default=0.5,
+                        help="Prior weight for PIGLasso (default 0.5).")
     parser.add_argument("--out", default="results/dream5/")
     args = parser.parse_args()
 
@@ -89,6 +96,44 @@ def main() -> None:
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=args.n_jobs)
         est.fit(X)
+        adj = est.get_adjacency()
+        scores = est.precision_
+
+    elif args.method == "piglasso_corr":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        from nodis.estimators.prior_utils import build_corr_prior
+        prior = build_corr_prior(X)
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
+        est.fit(X, prior=prior)
+        adj = est.get_adjacency()
+        scores = est.precision_
+
+    elif args.method == "piglasso_string":
+        prior_path = pathlib.Path(args.prior_dir) / f"prior_string_p{p}.npy"
+        genes_path = pathlib.Path(args.prior_dir) / f"prior_string_p{p}_genes.txt"
+        if not prior_path.exists():
+            raise FileNotFoundError(
+                f"STRING prior not found: {prior_path}\n"
+                "Run scripts/build_dream5_prior.py first."
+            )
+        prior = np.load(prior_path)
+        # Reindex prior if gene order differs from current selection
+        if genes_path.exists():
+            prior_genes = genes_path.read_text().splitlines()
+            if prior_genes != top_genes:
+                prior_idx = {g: i for i, g in enumerate(prior_genes)}
+                sel_idx = np.array([prior_idx[g] for g in top_genes
+                                    if g in prior_idx])
+                if len(sel_idx) == p:
+                    prior = prior[np.ix_(sel_idx, sel_idx)]
+                else:
+                    raise ValueError(
+                        f"Gene mismatch: prior has {len(prior_genes)} genes, "
+                        f"only {len(sel_idx)}/{p} match expression file."
+                    )
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
+        est.fit(X, prior=prior)
         adj = est.get_adjacency()
         scores = est.precision_
 

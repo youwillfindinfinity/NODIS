@@ -1,0 +1,50 @@
+#!/bin/bash
+#SBATCH --job-name=pig_prior
+#SBATCH --output=logs/pig_prior_%A_%a.out
+#SBATCH --error=logs/pig_prior_%A_%a.err
+#SBATCH --time=05:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32768M            # 32 GB — 8 GB/task for 4 parallel tasks
+#SBATCH --array=0-99            # 100 jobs × 8 tasks = 800 (4 topos × 4 configs × 50 reps)
+# Method: piglasso_corr  (correlation prior, no ground-truth leak)
+# Grid:   4 topologies × 4 configs × 50 reps = 800 tasks
+#
+# Submit after synthetic jobs finish:
+#   sbatch --partition=rome --dependency=afterok:21021372 jobs/piglasso_prior_synthetic.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164" "n1026p328")
+N_REPS=50
+TOTAL=800           # 4 × 4 × 50
+TASKS_PER_JOB=8
+
+mkdir -p "$HOME/NODIS/results/raw" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / (4 * N_REPS) ))
+    REM1=$(( FLAT % (4 * N_REPS) ))
+    CFG_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    TOPO=${TOPOS[$TOPO_IDX]}
+    CFG=${CONFIGS[$CFG_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=${CFG} method=piglasso_corr rep=${REP}"
+
+    python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+        --topology     "$TOPO"        \
+        --config       "$CFG"         \
+        --method       piglasso_corr  \
+        --rep          "$REP"         \
+        --prior-weight 0.5            \
+        --out          "$HOME/NODIS/results/raw/" &
+done
+
+wait
