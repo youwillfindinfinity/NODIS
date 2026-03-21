@@ -41,7 +41,7 @@ _COLUMNS = [
     "n_components_pred",
     # Null baseline (mean over N_NULL random graphs, same edge count as adj_pred)
     "diffusion_spearman_mean_null", "knockout_spearman_null",
-    # Normalised: (inferred - null) / (1.0 - null) for Spearman [0=random, 1=perfect]
+    # Normalised: (inferred - null) / (1.0 - null) for Spearman (-inf, 1]; 0=indistinguishable from null, 1=perfect, negative=worse than null
     "diffusion_spearman_norm", "knockout_spearman_norm",
     "wall_seconds",
 ]

@@ -24,6 +24,7 @@ import warnings
 
 import numpy as np
 from sklearn.covariance import empirical_covariance
+from gglasso.solver.single_admm_solver import ADMM_SGL
 
 
 class PIGLassoEstimator:
@@ -52,6 +53,16 @@ class PIGLassoEstimator:
     prior_weight : alpha in mask = 1 - alpha * prior  (0 = no prior effect)
     n_jobs       : parallel joblib workers (1 = sequential)
     seed         : random seed
+
+    Notes
+    -----
+    Stability scoring deviates from Meinshausen & Bühlmann (2010) Theorem 1:
+    ``stability_ij = max_lambda freq_ij_lambda`` is the maximum selection frequency
+    across the regularisation path, not the frequency at a single fixed lambda.
+    This provides a conservative upper bound on edge importance but the PFER control
+    guarantee of M&B Theorem 1 applies strictly only at a fixed lambda value.
+    The adaptive threshold ``pi_adaptive`` partially compensates for this, but the
+    theoretical justification is heuristic rather than direct.
     """
 
     def __init__(
@@ -118,8 +129,6 @@ class PIGLassoEstimator:
         counts  : (p, p, n_lams) int8 — 1 where |Theta_ij| > 1e-5
         success : (n_lams,) int8     — 1 where solver converged
         """
-        from gglasso.solver.single_admm_solver import ADMM_SGL
-
         p = sub.shape[1]
         n_lams = len(lambda_range)
         counts  = np.zeros((p, p, n_lams), dtype=np.int8)
@@ -140,12 +149,26 @@ class PIGLassoEstimator:
                         rtol=1e-4,
                         verbose=False,
                     )
-                Theta = sol[1]          # precision matrix estimate
+                # sol[0]: dict with keys 'Omega', 'Theta', 'X'
+                # sol[1]: dict with key 'status'
+                # Convergence check is outside the catch_warnings() block so
+                # RuntimeWarning is not suppressed by the inner filterwarnings("ignore").
+                status = sol[1].get("status", "") if isinstance(sol[1], dict) else ""
+                if status != "optimal":
+                    warnings.warn(
+                        f"ADMM_SGL did not converge at lambda={lam:.4f} "
+                        f"(status={status!r}). "
+                        "Subsample excluded from stability count.",
+                        RuntimeWarning,
+                        stacklevel=3,
+                    )
+                    continue  # success[li] stays 0; Omega_0 warm-start NOT updated
+                Theta = sol[0]["Theta"]  # precision matrix estimate
                 edge_mask = (np.abs(Theta) > 1e-5).astype(np.int8)
                 np.fill_diagonal(edge_mask, 0)
                 counts[:, :, li] = edge_mask
                 success[li] = 1
-                Omega_0 = sol[0]        # warm-start next lambda
+                Omega_0 = sol[0]["Omega"]  # warm-start next lambda
             except Exception:
                 pass
 
@@ -212,6 +235,8 @@ class PIGLassoEstimator:
 
         denom     = np.maximum(success_counts, 1.0)
         freq      = edge_counts / denom[np.newaxis, np.newaxis, :]
+        # Design choice: max over lambda path (conservative upper bound on selection prob).
+        # Deviates from M&B (2010) Theorem 1, which proves PFER at fixed lambda.
         stability = freq.max(axis=2).astype(np.float64)
         np.fill_diagonal(stability, 0.0)
         self._stability = stability

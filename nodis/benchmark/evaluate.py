@@ -74,7 +74,15 @@ def evaluate_predictions(
 
 
 def _aupr(y_true: np.ndarray, y_score: np.ndarray) -> float:
-    """Compute AUPR via the trapezoid rule on the precision-recall curve."""
+    """Compute AUPR via the trapezoid rule on the precision-recall curve.
+
+    Notes
+    -----
+    Uses ``sklearn.metrics.average_precision_score``, which computes AUPR via
+    step-function (right-weighted) interpolation, not trapezoidal. Results may
+    differ from linear-interpolation AUPR used in some DREAM challenge evaluations.
+    When comparing with external benchmarks, confirm the interpolation convention.
+    """
     from sklearn.metrics import average_precision_score
     if y_true.sum() == 0:
         return float("nan")
