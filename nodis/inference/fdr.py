@@ -44,6 +44,14 @@ def fdr_control(
     Returns
     -------
     adj : (p, p) integer ndarray — symmetric binary adjacency; diagonal = 0
+
+    Notes
+    -----
+    The BH procedure (method='BH') assumes independence or positive regression
+    dependence on a subset (PRDS). Precision matrix entries exhibit moderate
+    positive dependence via the concentration graph structure, but PRDS is not
+    formally guaranteed. For conservative FDR control under arbitrary dependency,
+    use method='BY' (Benjamini-Yekutieli 2001).
     """
     if p_values.ndim != 2 or p_values.shape[0] != p_values.shape[1]:
         raise ValueError("p_values must be a square 2-D array.")

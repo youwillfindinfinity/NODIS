@@ -68,6 +68,12 @@ def _precision_from_adjacency(
     A           : (p, p) symmetric binary adjacency, no self-loops
     edge_weight : magnitude of off-diagonal precision entries (default 0.3)
     min_eig     : minimum eigenvalue guarantee (default 0.1)
+
+    Notes
+    -----
+    The eigenvalue shift guarantees minimum eigenvalue >= 0.2 (not merely > 0.1).
+    When eigs.min() < 0: shift = |eigs.min()| + min_eig + 0.1, giving post-shift
+    min = 0.1 + 0.1 = 0.2.
     """
     p = A.shape[0]
     Theta = A.astype(float) * edge_weight
