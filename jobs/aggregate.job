@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_aggregate
+#SBATCH --output=logs/aggregate_%j.out
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --partition=thin
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+python - <<'EOF'
+import pathlib, pandas as pd
+
+results = pathlib.Path("results")
+sections = {
+    "synthetic": list(results.glob("raw/results_*.csv")),
+    "dream5":    list(results.glob("dream5/dream5_*.csv")),
+    "diffusion": list(results.glob("diffusion/diffusion_*.csv")),
+    "sergio":    list(results.glob("sergio/sergio_*.csv")),
+}
+
+all_dfs = []
+for source, files in sections.items():
+    if not files:
+        print(f"  {source}: no files found — skipping")
+        continue
+    df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    df["benchmark"] = source
+    all_dfs.append(df)
+    print(f"  {source}: {len(files)} files, {len(df)} rows")
+
+if all_dfs:
+    summary = pd.concat(all_dfs, ignore_index=True)
+    summary.to_csv(results / "metrics_summary.csv", index=False)
+    print(f"Saved {len(summary)} total rows → results/metrics_summary.csv")
+else:
+    print("No result files found.")
+EOF

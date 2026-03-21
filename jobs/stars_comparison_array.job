@@ -1,0 +1,47 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_stars
+#SBATCH --output=logs/stars_%A_%a.out
+#SBATCH --error=logs/stars_%A_%a.err
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M            # 16 × 1792 MiB — matches billing unit exactly
+#SBATCH --array=0-37            # 38 jobs × 16 tasks = 608 slots (covers 600)
+# --time and --partition set at submission time:
+#   sbatch --partition=rome --time=02:00:00 jobs/stars_comparison_array.job
+#
+# Task space: 4 topologies × 3 configs × 50 reps = 600
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+N_REPS=50
+TOTAL=600           # 4 × 3 × 50
+TASKS_PER_JOB=16
+
+mkdir -p "$HOME/NODIS/results/stars" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / (3 * N_REPS) ))
+    REM1=$(( FLAT % (3 * N_REPS) ))
+    CFG_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    TOPO=${TOPOS[$TOPO_IDX]}
+    CFG=${CONFIGS[$CFG_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=${CFG} rep=${REP}"
+
+    python "$HOME/NODIS/benchmarks/run_stars_comparison.py" \
+        --topology    "$TOPO" \
+        --config      "$CFG"  \
+        --rep         "$REP"  \
+        --n-subsamples 20     \
+        --out         "$HOME/NODIS/results/stars/" &
+done
+
+wait

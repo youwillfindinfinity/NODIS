@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nodis"
+version = "0.1.0"
+description = "Python-native statistical inference for Gaussian Graphical Models"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Roland V.Bumbuc" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "scikit-learn>=1.3",
+    "pandas>=2.0",
+    "networkx>=3.1",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "click>=8.1",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+r = ["rpy2>=3.5"]
+gglasso = ["gglasso>=0.3"]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black>=23.0",
+    "ruff>=0.1",
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=1.3",
+    "myst-parser>=2.0",
+]
+
+[project.scripts]
+nodis = "nodis.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/youwillfindinfinity/nodis"
+Documentation = "https://nodis.readthedocs.io"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nodis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "requires_r: marks tests that need R + rpy2 + SILGGM installed",
+]
+
+[tool.ruff]
+line-length = 99
+target-version = "py310"
+
+[tool.black]
+line-length = 99
+target-version = ["py310"]

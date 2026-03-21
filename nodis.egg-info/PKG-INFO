@@ -1,0 +1,105 @@
+Metadata-Version: 2.4
+Name: nodis
+Version: 0.1.0
+Summary: Python-native statistical inference for Gaussian Graphical Models
+Author: Roland Bumbuc
+License: MIT
+Project-URL: Homepage, https://github.com/rbumbuc/nodis
+Project-URL: Documentation, https://nodis.readthedocs.io
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: scipy>=1.11
+Requires-Dist: scikit-learn>=1.3
+Requires-Dist: pandas>=2.0
+Requires-Dist: networkx>=3.1
+Requires-Dist: matplotlib>=3.7
+Requires-Dist: seaborn>=0.12
+Requires-Dist: click>=8.1
+Requires-Dist: joblib>=1.3
+Provides-Extra: r
+Requires-Dist: rpy2>=3.5; extra == "r"
+Provides-Extra: gglasso
+Requires-Dist: gglasso>=0.3; extra == "gglasso"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4; extra == "dev"
+Requires-Dist: pytest-cov>=4.1; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: sphinx>=7.0; extra == "dev"
+Requires-Dist: sphinx-rtd-theme>=1.3; extra == "dev"
+Requires-Dist: myst-parser>=2.0; extra == "dev"
+
+# NODIS
+
+**Python-native statistical inference for Gaussian Graphical Models**
+
+NODIS implements the de-sparsified (de-biased) nodewise Lasso estimator for Gaussian
+Graphical Models (GGMs), providing edge-level p-values, confidence intervals, and
+FDR-controlled adjacency matrices for high-dimensional gene co-expression networks.
+
+It is the first Python package to offer statistically rigorous GGM inference without
+any R dependency in the core inference path.
+
+## Features
+
+- De-sparsified nodewise Lasso with asymptotic z-scores and two-sided p-values
+- Benjamini–Hochberg / Benjamini–Yekutieli FDR control
+- Asymptotic confidence intervals for all precision matrix entries
+- Nonparanormal (NPN) preprocessing for non-Gaussian expression data
+- Four graph topology generators: hub, scale-free, cluster, Erdős–Rényi
+- Baseline estimators: sklearn GraphicalLassoCV, GGLasso
+- CLI for simulate / run / evaluate workflows
+- SLURM array job templates for Snellius HPC
+
+## Installation
+
+```bash
+pip install nodis
+```
+
+For development:
+
+```bash
+git clone https://github.com/rbumbuc/nodis
+cd nodis
+pip install -e ".[dev]"
+```
+
+## Quick start
+
+```python
+import numpy as np
+from nodis.simulate.generator import generate
+from nodis.estimators.desparsified import DesparifiedGGM
+
+data = generate(n=200, p=50, topology="hub", seed=42)
+model = DesparifiedGGM().fit(data.X)
+
+# FDR-controlled adjacency matrix at alpha = 0.05
+adj = model.get_adjacency(alpha=0.05, method="BH")
+print(f"Edges detected: {adj.sum() // 2}")
+```
+
+## Mathematical basis
+
+The estimator implements the symmetrised B_NW_SL (Bias-corrected Nodewise regression
+with Scaled Lasso) approach:
+
+For each pair (i, j):
+
+```
+ω̂_ij = (−β̂_ij / τ̂²_i  −  β̂_ji / τ̂²_j) / 2
+σ̂²_ij = τ̂²_i · τ̂²_j
+Z_ij   = √n · ω̂_ij / σ̂_ij   →  N(0,1) under H₀: ω_ij = 0
+```
+
+**References:**
+
+- van de Geer S, et al. (2014). Ann Stat 42(3): 1166–1202.
+- Zhang C-H, Zhang SS (2014). J R Stat Soc B 76(1): 217–242.
+- Zhang R, Ren Z, Chen W (2018). PLoS Comput Biol 14(8): e1006369. [SILGGM]
+
+## Licence
+
+MIT
