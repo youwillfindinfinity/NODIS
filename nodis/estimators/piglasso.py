@@ -24,7 +24,14 @@ import warnings
 
 import numpy as np
 from sklearn.covariance import empirical_covariance
-from gglasso.solver.single_admm_solver import ADMM_SGL
+
+try:
+    from gglasso.solver.single_admm_solver import ADMM_SGL as _ADMM_SGL_impl
+except ImportError:
+    _ADMM_SGL_impl = None  # type: ignore
+
+# Module-level reference that can be monkeypatched:
+ADMM_SGL = _ADMM_SGL_impl
 
 
 class PIGLassoEstimator:
@@ -129,6 +136,12 @@ class PIGLassoEstimator:
         counts  : (p, p, n_lams) int8 — 1 where |Theta_ij| > 1e-5
         success : (n_lams,) int8     — 1 where solver converged
         """
+        if ADMM_SGL is None:
+            raise ImportError(
+                "gglasso is required for PIGLassoEstimator. "
+                "Install it with: pip install gglasso"
+            )
+
         p = sub.shape[1]
         n_lams = len(lambda_range)
         counts  = np.zeros((p, p, n_lams), dtype=np.int8)
@@ -289,3 +302,8 @@ class PIGLassoEstimator:
         if self._stability is None:
             raise RuntimeError("Call fit() before accessing precision_.")
         return self._stability
+
+    @property
+    def stability_(self) -> np.ndarray:
+        """Alias for precision_: stability scores for each edge."""
+        return self.precision_
