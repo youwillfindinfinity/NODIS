@@ -2,7 +2,7 @@
 #SBATCH --job-name=pig_diff_n1026
 #SBATCH --output=logs/pig_diff_n1026_%A_%a.out
 #SBATCH --error=logs/pig_diff_n1026_%A_%a.err
-#SBATCH --time=00:30:00
+#SBATCH --time=03:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32768M            # 32 GB — 4 GB/task for 8 parallel tasks

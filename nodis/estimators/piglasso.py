@@ -55,7 +55,7 @@ class PIGLassoEstimator:
                    max_edges = p(p-1)/2.  The computed value is stored in
                    pi_thr_adaptive_ after fit() is called.
     v_target     : target PFER (expected number of false edges) used when
-                   pi_thr="adaptive".  Default 1.0.  Increase to be more
+                   pi_thr="adaptive".  Default 1.0 (one expected false edge).  Increase to be more
                    permissive; decrease to be more conservative.
     prior_weight : alpha in mask = 1 - alpha * prior  (0 = no prior effect)
     n_jobs       : parallel joblib workers (1 = sequential)
@@ -79,7 +79,7 @@ class PIGLassoEstimator:
         n_lambda: int = 20,
         lambda_lo: float = 0.05,
         lambda_hi: float = 0.30,
-        pi_thr: float | str = 0.5,
+        pi_thr: float | str = 0.9,
         v_target: float = 1.0,
         prior_weight: float = 0.5,
         n_jobs: int = 1,

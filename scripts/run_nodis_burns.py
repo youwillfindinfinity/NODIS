@@ -101,8 +101,8 @@ def npn_shrinkage(X: np.ndarray) -> np.ndarray:
 
 def run_desparsified(X: np.ndarray, gene_names: list[str], lambda_scale: float = 1.0):
     """Fit DesparsifiedGGM. Returns (z_scores, p_values) as DataFrames."""
-    from nodis.estimators.desparsified import DesparsifiedGGM
-    from nodis.inference.pvalues import compute_pvalues
+    from nodis.estimators.desparsified import DesparifiedGGM as DesparsifiedGGM
+    from nodis.inference.pvalues import z_to_pvalues as compute_pvalues
 
     n, p = X.shape
     print(f"Fitting DesparsifiedGGM: n={n}, p={p}, n/p={n/p:.2f}")
@@ -116,15 +116,15 @@ def run_desparsified(X: np.ndarray, gene_names: list[str], lambda_scale: float =
     est = DesparsifiedGGM(lambda_scale=lambda_scale)
     est.fit(X)
 
-    Z = pd.DataFrame(est.z_scores_, index=gene_names, columns=gene_names)
-    P = pd.DataFrame(compute_pvalues(est.z_scores_), index=gene_names, columns=gene_names)
+    Z = pd.DataFrame(est.result_.z_scores, index=gene_names, columns=gene_names)
+    P = pd.DataFrame(compute_pvalues(est.result_.z_scores), index=gene_names, columns=gene_names)
     return Z, P
 
 
 def apply_fdr(P: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    from nodis.inference.fdr import fdr_adjacency
+    from nodis.inference.fdr import fdr_control
     p_arr = P.values
-    adj = fdr_adjacency(p_arr, alpha=alpha, method="BH")
+    adj = fdr_control(p_arr, alpha=alpha, method="BH")
     return pd.DataFrame(adj, index=P.index, columns=P.columns)
 
 
@@ -165,11 +165,15 @@ def main() -> None:
     parser.add_argument("--expr", required=True, type=pathlib.Path,
                         help="genes × samples TSV (preprocessed by PIGLasso pipeline).")
     parser.add_argument("--ctrl-genes", type=pathlib.Path, default=None,
-                        help="healthy_controls.genes.txt from GSE236713. "
-                             "Expression is intersected to these genes.")
+                        help="Gene symbol list for intersection. "
+                             "Expression is restricted to these genes.")
     parser.add_argument("--no-intersect", action="store_true",
                         help="Skip gene intersection (uses all genes in --expr). "
                              "WARNING: n/p will be very low for top-5000 input.")
+    parser.add_argument("--top-p", type=int, default=None,
+                        help="After any intersection, retain only the top-p genes "
+                             "by expression variance. Use to control n/p ratio "
+                             "(e.g. --top-p 164 gives n/p≈3.6 at n=584).")
     parser.add_argument("--lambda-scale", type=float, default=1.0,
                         help="Scaling constant for the scaled Lasso tuning parameter.")
     parser.add_argument("--out", required=True, type=pathlib.Path,
@@ -189,6 +193,13 @@ def main() -> None:
             raise ValueError("--ctrl-genes required unless --no-intersect is set.")
         ctrl_genes = load_gene_list(args.ctrl_genes)
         expr = intersect_expression(expr, ctrl_genes)
+
+    # 2b. Optionally restrict to top-p genes by variance
+    if args.top_p is not None and args.top_p < len(expr):
+        gene_var = expr.var(axis=1)
+        top_genes = gene_var.nlargest(args.top_p).index.tolist()
+        expr = expr.loc[top_genes]
+        print(f"Restricted to top-{args.top_p} genes by variance: {len(expr)} genes remain")
 
     gene_names = list(expr.index)
     p = len(gene_names)

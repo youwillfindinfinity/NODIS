@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --job-name=ci_coverage
+#SBATCH --output=logs/ci_coverage_%j.out
+#SBATCH --error=logs/ci_coverage_%j.err
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4096M
+# Submit: sbatch --partition=rome jobs/ensemble_ci_coverage.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+mkdir -p "$HOME/NODIS/finalisation" "$HOME/NODIS/logs"
+
+python "$HOME/NODIS/scripts/run_ensemble_ci_coverage.py" \
+    --n-trials 100 \
+    --out "$HOME/NODIS/finalisation/"
+
+echo "Done."

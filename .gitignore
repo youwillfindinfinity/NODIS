@@ -60,7 +60,8 @@ secrets.json
 
 # ── Results & outputs ───────────────────────────────────────────────────────
 # Local results (re-generatable from benchmarks)
-results/
+results/*
+!results/burns
 # Raw Snellius HPC outputs (167 MB+)
 results_snellius_raw/
 # Keep figures tracked (only 468 KB)
