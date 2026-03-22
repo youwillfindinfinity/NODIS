@@ -10,11 +10,12 @@
 #
 # Runs NODIS de-sparsified inference on burn expression data.
 # Input:  PIGLasso-preprocessed expression_top5000.tsv (genes×samples, z-scored)
-# Genes:  intersected with GSE236713 healthy_controls.genes.txt (~164 genes)
+# Genes:  top-164 by variance (n/p ≈ 3.6, CAUTIONARY range)
+#         Note: GSE236713 healthy_controls.genes.txt contains probe IDs (not gene
+#         symbols) so cannot be used for intersection; top-p filter used instead.
 # Output: burns_nodis_zscores.csv, pvalues.csv, adj_fdr05.csv, adj_fdr10.csv
 #
-# n/p ≈ 3.6 at intersection gene set — CAUTIONARY range, results labelled.
-# Wall time ~2 min at p~164. Requesting 1h to be safe.
+# Wall time ~2 min at p=164. Requesting 1h to be safe.
 
 [[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
 source "$HOME/NODIS/.venv/bin/activate"
@@ -22,8 +23,9 @@ source "$HOME/NODIS/.venv/bin/activate"
 mkdir -p "$HOME/NODIS/results/burns" "$HOME/NODIS/logs"
 
 python "$HOME/NODIS/scripts/run_nodis_burns.py" \
-    --expr      "$HOME/PIGLasso/data/burn/expression_top5000.tsv" \
-    --ctrl-genes "$HOME/PIGLasso/data/gse236713/healthy_controls.genes.txt" \
-    --out       "$HOME/NODIS/results/burns/"
+    --expr        "$HOME/PIGLasso/data/burn/expression_top5000.tsv" \
+    --no-intersect \
+    --top-p       164 \
+    --out         "$HOME/NODIS/results/burns/"
 
 echo "[INFO] NODIS burns inference done."

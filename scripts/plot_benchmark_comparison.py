@@ -1,16 +1,25 @@
 """
 plot_benchmark_comparison.py
 ----------------------------
-Publication-quality benchmark comparison: PIGLasso vs all methods.
-Nature-style multi-panel figure.
+Publication-quality 6-panel benchmark comparison.
+Highlights PIGLasso with crimson throughout.
+
+Panels:
+  A  Radar chart — grand mean across AUPR, AUROC, MCC, F1_opt (synthetic)
+  B  MCC per topology — violin+IQR (synthetic, 3 configs pooled)
+  C  Scalability — AUPR vs. problem size (line plot with CI bands)
+  D  Diffusion recovery — normalised Spearman by topology & method
+  E  DREAM5 — AUPR vs. gene-set size (line, p=200/500/1000)
+  F  Computational cost — median wall time at n=513, p=164 (log-scale)
 
 Usage:
+    cd NODIS/
     python scripts/plot_benchmark_comparison.py
     python scripts/plot_benchmark_comparison.py --out figures/benchmark_comparison.pdf
 """
 
 import argparse
-import glob
+import math
 import os
 import warnings
 
@@ -21,483 +30,483 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
-from matplotlib.lines import Line2D
+from matplotlib.path import Path
 
 warnings.filterwarnings("ignore")
+
+# ---------------------------------------------------------------------------
+# Global style
+# ---------------------------------------------------------------------------
 matplotlib.rcParams.update({
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size": 8,
-    "axes.labelsize": 9,
-    "axes.titlesize": 9,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
-    "legend.fontsize": 8,
-    "figure.dpi": 300,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "axes.linewidth": 0.8,
-    "xtick.major.width": 0.8,
-    "ytick.major.width": 0.8,
-    "xtick.minor.width": 0.5,
-    "ytick.minor.width": 0.5,
-    "xtick.major.size": 3.5,
-    "ytick.major.size": 3.5,
-    "pdf.fonttype": 42,   # embeds fonts in PDF
-    "ps.fonttype": 42,
+    "font.family":        "sans-serif",
+    "font.sans-serif":    ["Arial", "Helvetica", "DejaVu Sans"],
+    "font.size":          8,
+    "axes.labelsize":     9,
+    "axes.titlesize":     9.5,
+    "xtick.labelsize":    7.5,
+    "ytick.labelsize":    7.5,
+    "legend.fontsize":    8,
+    "figure.dpi":         300,
+    "axes.spines.top":    False,
+    "axes.spines.right":  False,
+    "axes.linewidth":     0.8,
+    "xtick.major.width":  0.8,
+    "ytick.major.width":  0.8,
+    "xtick.major.size":   3.5,
+    "ytick.major.size":   3.5,
+    "pdf.fonttype":       42,
+    "ps.fonttype":        42,
 })
 
 # ---------------------------------------------------------------------------
-# Colour scheme  (Wong colourblind palette base, PIGLasso vivid red)
+# Colour + method metadata
 # ---------------------------------------------------------------------------
-METHODS = ["desparsified", "glasso", "gglasso", "piglasso"]
+METHODS_MAIN = ["desparsified", "glasso", "gglasso", "piglasso"]
 
 PALETTE = {
-    "desparsified": "#5B9BD5",   # steel blue
-    "glasso":       "#70AD47",   # medium green
-    "gglasso":      "#FFC000",   # amber
-    "piglasso":     "#C00000",   # deep crimson  ← HIGHLIGHT
+    "desparsified": "#5B9BD5",
+    "glasso":       "#70AD47",
+    "gglasso":      "#FFC000",
+    "piglasso":     "#C00000",   # crimson — PIGLasso highlight
+    "piglasso_corr":"#C00000",
 }
 LABELS = {
     "desparsified": "Desparsified",
     "glasso":       "GLasso",
     "gglasso":      "GGLasso",
     "piglasso":     "PIGLasso",
+    "piglasso_corr":"PIGLasso",
 }
-PIGLASSO_ZORDER = 5
-BASE_ZORDER = 2
+PIG_METHODS = {"piglasso", "piglasso_corr"}
+ZO_PIG   = 5
+ZO_BASE  = 2
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
+SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
 
 
 # ---------------------------------------------------------------------------
-# Data loaders
+# Data helpers
 # ---------------------------------------------------------------------------
 
-def load_synthetic() -> pd.DataFrame:
-    """Load & concatenate all synthetic CSVs (metrics_summary.csv + piglasso)."""
-    summary = os.path.join(RESULTS_DIR, "metrics_summary.csv")
-    dfs = [pd.read_csv(summary)]
-
-    pig_files = glob.glob(
-        os.path.join(RESULTS_DIR, "piglasso", "synthetic", "results_*.csv")
-    )
-    if pig_files:
-        dfs.append(pd.concat([pd.read_csv(f) for f in pig_files], ignore_index=True))
-
-    df = pd.concat(dfs, ignore_index=True)
-    df["config_label"] = df["config"].map(
-        {"n100p50": "n=100, p=50", "n237p78": "n=237, p=78", "n513p164": "n=513, p=164"}
-    )
+def _load() -> pd.DataFrame:
+    df = pd.read_csv(SUMMARY_CSV)
+    # Normalise method labels: treat piglasso_corr as piglasso for dream5 panel
     return df
 
 
-def load_dream5() -> pd.DataFrame:
-    rows = []
-    for method in METHODS:
-        path = os.path.join(RESULTS_DIR, method, "dream5")
-        for f in glob.glob(os.path.join(path, "*.csv")):
-            rows.append(pd.read_csv(f))
-    if not rows:
-        return pd.DataFrame()
-    df = pd.concat(rows, ignore_index=True)
-    df["method"] = df["method"].str.lower()
-    return df
-
-
-def load_sergio() -> pd.DataFrame:
-    rows = []
-    for method in METHODS:
-        path = os.path.join(RESULTS_DIR, method, "sergio")
-        for f in glob.glob(os.path.join(path, "*.csv")):
-            rows.append(pd.read_csv(f))
-    if not rows:
-        return pd.DataFrame()
-    df = pd.concat(rows, ignore_index=True)
-    df["method"] = df["method"].str.lower()
-    return df
-
-
-def load_diffusion() -> pd.DataFrame:
-    rows = []
-    for method in METHODS:
-        path = os.path.join(RESULTS_DIR, method, "diffusion")
-        files = glob.glob(os.path.join(path, "*.csv"))
-        for f in files:
-            rows.append(pd.read_csv(f))
-    if not rows:
-        return pd.DataFrame()
-    df = pd.concat(rows, ignore_index=True)
-    df["method"] = df["method"].str.lower()
-    return df
+def _methods_present(df, pool):
+    present = df["method"].unique()
+    return [m for m in pool if m in present]
 
 
 # ---------------------------------------------------------------------------
-# Plotting helpers
+# Panel A — Radar chart
 # ---------------------------------------------------------------------------
 
-def _bar_group(ax, data, metric, methods_present, ylabel, title,
-               ylim=None, chance_line=None, fmt_pct=True):
-    """Grouped bar plot: one bar per method, mean ± SEM."""
-    n = len(methods_present)
-    x = np.arange(n)
-    width = 0.65
+def _radar(ax, data, methods, metrics, metric_labels, title):
+    """
+    Filled radar chart.  Each method is a closed polygon over the metrics.
+    Values normalised so that best method = 1 on each axis.
+    """
+    n = len(metrics)
+    angles = np.linspace(0, 2 * math.pi, n, endpoint=False).tolist()
+    angles += angles[:1]  # close polygon
 
-    for i, m in enumerate(methods_present):
-        vals = data.loc[data["method"] == m, metric].dropna()
-        if vals.empty:
-            continue
-        mu, se = vals.mean(), vals.sem()
+    ax.set_theta_offset(math.pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(metric_labels, size=8.5, fontweight="bold")
+    ax.set_ylim(0, 1)
+    ax.set_yticks([0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["0.25", "0.50", "0.75", "1.00"], size=6.5, color="grey")
+    ax.tick_params(pad=7)
+    ax.spines["polar"].set_color("#cccccc")
+    ax.grid(color="#dddddd", linewidth=0.7)
+
+    # Compute per-metric grand means (across all 3 configs, 4 topos, 50 reps)
+    small3 = data[data["config"].isin(["n100p50", "n237p78", "n513p164"])]
+    raw = {}
+    for m in methods:
+        sub = small3[small3["method"] == m]
+        raw[m] = [sub[met].mean() for met in metrics]
+
+    # Normalise: scale so max across methods = 1 per metric
+    maxes = [max(raw[m][i] for m in methods if raw[m][i] == raw[m][i])
+             for i in range(n)]
+    maxes = [v if v > 0 else 1.0 for v in maxes]
+    norm = {m: [raw[m][i] / maxes[i] for i in range(n)] for m in methods}
+
+    for m in methods:
+        vals = norm[m] + norm[m][:1]
         color = PALETTE[m]
-        lw = 2.0 if m == "piglasso" else 0.8
-        ec = "#7B0000" if m == "piglasso" else "#333333"
-        zorder = PIGLASSO_ZORDER if m == "piglasso" else BASE_ZORDER
-        bar = ax.bar(x[i], mu, width * 0.7, color=color, edgecolor=ec,
-                     linewidth=lw, zorder=zorder)
-        ax.errorbar(x[i], mu, yerr=se, fmt="none", color="black",
-                    capsize=2.5, capthick=0.8, linewidth=0.8, zorder=zorder + 1)
-        if m == "piglasso":
-            ax.bar(x[i], mu, width * 0.7, color="none", edgecolor=ec,
-                   linewidth=2.2, zorder=zorder + 1)
-            ax.text(x[i], mu + se + 0.01 * (ylim[1] - ylim[0] if ylim else 0.05),
-                    "★", ha="center", va="bottom", fontsize=9,
-                    color="#C00000", zorder=zorder + 2)
+        lw   = 2.4 if m in PIG_METHODS else 1.2
+        zo   = ZO_PIG if m in PIG_METHODS else ZO_BASE
+        alpha_fill = 0.20 if m in PIG_METHODS else 0.06
+        ax.plot(angles, vals, color=color, linewidth=lw,
+                zorder=zo, label=LABELS[m])
+        ax.fill(angles, vals, color=color, alpha=alpha_fill, zorder=zo - 1)
+        # Mark PIGLasso vertices
+        if m in PIG_METHODS:
+            ax.scatter(angles[:-1], vals[:-1], color=color, s=25,
+                       zorder=zo + 1, edgecolors="white", linewidths=0.8)
 
-    if chance_line is not None:
-        ax.axhline(chance_line, color="grey", linestyle="--",
-                   linewidth=0.8, zorder=1, alpha=0.7)
+    ax.set_title(title, pad=18, fontweight="bold", size=9.5)
 
-    ax.set_xticks(x)
-    ax.set_xticklabels([LABELS[m] for m in methods_present],
-                       rotation=30, ha="right")
+
+# ---------------------------------------------------------------------------
+# Panel B — MCC per topology  (violin + IQR)
+# ---------------------------------------------------------------------------
+
+def _violin_topology(ax, data, metric, methods, ylabel, title, ylim=None):
+    small3 = data[data["config"].isin(["n100p50", "n237p78", "n513p164"])]
+    topos = ["cluster", "hub", "random", "scale-free"]
+    n_topo  = len(topos)
+    n_meth  = len(methods)
+    gw      = 0.88
+    bw      = gw / n_meth
+    offsets = np.linspace(-gw / 2 + bw / 2, gw / 2 - bw / 2, n_meth)
+
+    for ti, topo in enumerate(topos):
+        for mi, m in enumerate(methods):
+            vals = small3.loc[
+                (small3["method"] == m) & (small3["topology"] == topo), metric
+            ].dropna().values
+            if len(vals) < 4:
+                continue
+            xp    = ti + offsets[mi]
+            color = PALETTE[m]
+            lw    = 1.8 if m in PIG_METHODS else 0.7
+            zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
+            alpha = 0.75 if m in PIG_METHODS else 0.45
+
+            vp = ax.violinplot(vals, positions=[xp], widths=bw * 0.88,
+                               showmedians=False, showextrema=False)
+            for body in vp["bodies"]:
+                body.set_facecolor(color)
+                body.set_alpha(alpha)
+                body.set_edgecolor(color)
+                body.set_linewidth(lw)
+                body.set_zorder(zo)
+                # Hard-clip violins to [0,1]
+                for path in body.get_paths():
+                    path.vertices[:, 1] = np.clip(path.vertices[:, 1], 0.0, 1.0)
+
+            q25, med, q75 = np.percentile(vals, [25, 50, 75])
+            iqr_lw = lw * 2.0 if m in PIG_METHODS else lw * 1.4
+            ax.vlines(xp, q25, q75, color=color, linewidth=iqr_lw,
+                      zorder=zo + 1, capstyle="round")
+            ax.scatter(xp, med, color="white", s=14,
+                       edgecolors=color, linewidths=lw, zorder=zo + 2)
+
+    ax.set_xticks(np.arange(n_topo))
+    ax.set_xticklabels([t.replace("-", "\u2011") for t in topos])  # non-breaking hyphen
     ax.set_ylabel(ylabel)
     ax.set_title(title, pad=4, fontweight="bold")
     if ylim:
         ax.set_ylim(*ylim)
-    ax.yaxis.set_major_formatter(
-        mticker.FuncFormatter(lambda v, _: f"{v:.0%}" if fmt_pct else f"{v:.2f}")
-    )
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
+    ax.axhline(0, color="#bbbbbb", linewidth=0.6, linestyle=":")
 
 
-def _violin_box(ax, data, metric, methods_present, ylabel, title,
-                ylim=None, topology_order=None):
-    """
-    Split violin + box plot: one violin per method.
-    Optionally facet by topology if topology_order provided.
-    """
-    if topology_order:
-        n_topo = len(topology_order)
-        n_meth = len(methods_present)
-        group_width = 0.9
-        bar_width = group_width / n_meth
-        offsets = np.linspace(-group_width / 2 + bar_width / 2,
-                               group_width / 2 - bar_width / 2, n_meth)
+# ---------------------------------------------------------------------------
+# Panel C — Scalability line plot
+# ---------------------------------------------------------------------------
 
-        for ti, topo in enumerate(topology_order):
-            for mi, m in enumerate(methods_present):
-                vals = data.loc[
-                    (data["method"] == m) & (data["topology"] == topo), metric
-                ].dropna().values
-                if len(vals) < 3:
-                    continue
-                xpos = ti + offsets[mi]
-                color = PALETTE[m]
-                lw = 1.8 if m == "piglasso" else 0.7
-                zorder = PIGLASSO_ZORDER if m == "piglasso" else BASE_ZORDER
-
-                vp = ax.violinplot(vals, positions=[xpos],
-                                   widths=bar_width * 0.9,
-                                   showmedians=False, showextrema=False)
-                for body in vp["bodies"]:
-                    body.set_facecolor(color)
-                    body.set_alpha(0.55 if m != "piglasso" else 0.80)
-                    body.set_edgecolor(color)
-                    body.set_linewidth(lw)
-                    body.set_zorder(zorder)
-                    # Clip KDE paths to [0, 1] to avoid artefacts
-                    paths = body.get_paths()
-                    for path in paths:
-                        path.vertices[:, 1] = np.clip(path.vertices[:, 1], 0.0, 1.0)
-
-                q25, med, q75 = np.percentile(vals, [25, 50, 75])
-                ax.vlines(xpos, q25, q75, color=color, linewidth=lw * 1.5,
-                          zorder=zorder + 1)
-                ax.scatter(xpos, med, color="white", s=10,
-                           edgecolors=color, linewidths=lw,
-                           zorder=zorder + 2)
-
-        ax.set_xticks(np.arange(n_topo))
-        ax.set_xticklabels([t.replace("-", "\n") for t in topology_order])
-        ax.set_xlabel("Topology")
-
-    ax.set_ylabel(ylabel)
-    ax.set_title(title, pad=4, fontweight="bold")
-    if ylim:
-        ax.set_ylim(*ylim)
-    ax.yaxis.set_major_formatter(
-        mticker.FuncFormatter(lambda v, _: f"{v:.0%}")
-    )
+CONFIGS      = ["n100p50", "n237p78", "n513p164"]
+CONFIG_XLABS = ["n=100\np=50", "n=237\np=78", "n=513\np=164"]
 
 
-def _line_scalability(ax, data, metric, methods_present, ylabel, title,
-                      configs=("n100p50", "n237p78", "n513p164"),
-                      config_labels=("n=100\np=50", "n=237\np=78", "n=513\np=164")):
-    """Line plot: metric vs. problem size (scalability)."""
-    x = np.arange(len(configs))
-    for m in methods_present:
-        mu_list, se_list = [], []
-        for cfg in configs:
-            vals = data.loc[
-                (data["method"] == m) & (data["config"] == cfg), metric
+def _scalability(ax, data, metric, methods, ylabel, title):
+    small3 = data[data["config"].isin(CONFIGS)]
+    x = np.arange(len(CONFIGS))
+    for m in methods:
+        mus, sems = [], []
+        for cfg in CONFIGS:
+            vals = small3.loc[
+                (small3["method"] == m) & (small3["config"] == cfg), metric
             ].dropna()
-            mu_list.append(vals.mean() if not vals.empty else np.nan)
-            se_list.append(vals.sem() if not vals.empty else 0.0)
-        mu_arr = np.array(mu_list)
-        se_arr = np.array(se_list)
+            mus.append(vals.mean() if len(vals) else np.nan)
+            sems.append(vals.sem()  if len(vals) else 0.0)
+        mu  = np.array(mus)
+        sem = np.array(sems)
         color = PALETTE[m]
-        lw = 2.2 if m == "piglasso" else 1.2
-        ms = 7 if m == "piglasso" else 4
-        mk = "D" if m == "piglasso" else "o"
-        zo = PIGLASSO_ZORDER if m == "piglasso" else BASE_ZORDER
-        ax.plot(x, mu_arr, color=color, lw=lw, marker=mk, ms=ms,
-                zorder=zo, label=LABELS[m],
-                markeredgewidth=1.2 if m == "piglasso" else 0.5,
-                markeredgecolor="#7B0000" if m == "piglasso" else color)
-        ax.fill_between(x, mu_arr - se_arr, mu_arr + se_arr,
-                        color=color, alpha=0.12, zorder=zo - 1)
+        lw    = 2.4 if m in PIG_METHODS else 1.3
+        ms    = 8   if m in PIG_METHODS else 4.5
+        mk    = "D" if m in PIG_METHODS else "o"
+        zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
+        mec   = "#7B0000" if m in PIG_METHODS else color
+        mew   = 1.4 if m in PIG_METHODS else 0.5
+        ax.plot(x, mu, color=color, lw=lw, marker=mk, ms=ms, zorder=zo,
+                label=LABELS[m], markeredgecolor=mec, markeredgewidth=mew,
+                solid_capstyle="round")
+        ax.fill_between(x, mu - sem, mu + sem, color=color, alpha=0.13,
+                        zorder=zo - 1)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(list(config_labels))
+    ax.set_xticklabels(CONFIG_XLABS)
     ax.set_ylabel(ylabel)
     ax.set_title(title, pad=4, fontweight="bold")
-    ax.yaxis.set_major_formatter(
-        mticker.FuncFormatter(lambda v, _: f"{v:.0%}")
-    )
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
+    ax.legend(loc="lower right", frameon=False, fontsize=7.5,
+              handlelength=1.6, labelspacing=0.4)
 
 
-def _wall_time_bar(ax, data, methods_present, title):
-    """Horizontal log-scale bar chart: median wall time."""
-    n = len(methods_present)
-    y = np.arange(n)
-    for i, m in enumerate(reversed(methods_present)):
-        vals = data.loc[data["method"] == m, "wall_seconds"].dropna()
+# ---------------------------------------------------------------------------
+# Panel D — Diffusion recovery per topology (grouped bar)
+# ---------------------------------------------------------------------------
+
+def _diffusion_topology(ax, data, methods, title):
+    """
+    Grouped bar: DiffSp_norm per topology (small3 configs only).
+    """
+    small3_diff = data[
+        (data["benchmark"] == "diffusion") &
+        (data["config"].isin(CONFIGS))
+    ]
+    topos   = ["cluster", "hub", "random", "scale-free"]
+    n_topo  = len(topos)
+    n_meth  = len(methods)
+    gw      = 0.80
+    bw      = gw / n_meth
+    offsets = np.linspace(-gw / 2 + bw / 2, gw / 2 - bw / 2, n_meth)
+
+    for ti, topo in enumerate(topos):
+        for mi, m in enumerate(methods):
+            vals = small3_diff.loc[
+                (small3_diff["method"] == m) &
+                (small3_diff["topology"] == topo),
+                "diffusion_spearman_norm"
+            ].dropna()
+            if vals.empty:
+                continue
+            mu  = vals.mean()
+            sem = vals.sem()
+            xp    = ti + offsets[mi]
+            color = PALETTE[m]
+            lw    = 1.8 if m in PIG_METHODS else 0.7
+            ec    = "#7B0000" if m in PIG_METHODS else "#444444"
+            zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
+            ax.bar(xp, mu, bw * 0.88, color=color, edgecolor=ec,
+                   linewidth=lw, zorder=zo)
+            ax.errorbar(xp, mu, yerr=sem, fmt="none", color="black",
+                        capsize=2, capthick=0.7, linewidth=0.7, zorder=zo + 1)
+            if m in PIG_METHODS:
+                ax.bar(xp, mu, bw * 0.88, color="none", edgecolor=ec,
+                       linewidth=2.0, zorder=zo + 1)
+
+    ax.set_xticks(np.arange(n_topo))
+    ax.set_xticklabels([t.replace("-", "\u2011") for t in topos])
+    ax.axhline(0, color="#999999", linewidth=0.8, linestyle="--", alpha=0.7)
+    ax.set_ylabel("Normalised Spearman ρ")
+    ax.set_title(title, pad=4, fontweight="bold")
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
+
+
+# ---------------------------------------------------------------------------
+# Panel E — DREAM5 line plot (AUPR vs p)
+# ---------------------------------------------------------------------------
+
+def _dream5_line(ax, data, title):
+    """
+    Line plot: AUPR vs. gene-set size (p = 200, 500, 1000).
+    Uses piglasso_corr as PIGLasso representative (no plain piglasso in dream5).
+    """
+    d5 = data[(data["benchmark"] == "dream5") & (data["network"] == 1)].copy()
+    if d5.empty:
+        ax.text(0.5, 0.5, "DREAM5 data\nnot available",
+                ha="center", va="center", transform=ax.transAxes, color="grey")
+        ax.set_title(title, pad=4, fontweight="bold")
+        return
+
+    # Map piglasso_corr → piglasso for display
+    d5["method_disp"] = d5["method"].replace({"piglasso_corr": "piglasso"})
+    # Remove piglasso_string (duplicate) for cleanliness
+    d5 = d5[d5["method"] != "piglasso_string"]
+
+    disp_methods = ["desparsified", "glasso", "gglasso", "piglasso"]
+    ps = [200, 500, 1000]
+    x  = np.arange(len(ps))
+
+    for m in disp_methods:
+        sub = d5[d5["method_disp"] == m]
+        mus = [sub.loc[sub["p"] == p, "aupr"].mean() for p in ps]
+        color = PALETTE[m]
+        lw    = 2.4 if m in PIG_METHODS else 1.3
+        ms    = 7   if m in PIG_METHODS else 4
+        mk    = "D" if m in PIG_METHODS else "o"
+        zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
+        mec   = "#7B0000" if m in PIG_METHODS else color
+        ax.plot(x, mus, color=color, lw=lw, marker=mk, ms=ms, zorder=zo,
+                label=LABELS[m], markeredgecolor=mec, markeredgewidth=1.2 if m in PIG_METHODS else 0.5)
+
+    # Coverage annotation band
+    coverage = [0.408, 0.133, 0.087]
+    ax2 = ax.twinx()
+    ax2.fill_between(x, 0, coverage, color="#dddddd", alpha=0.45,
+                     label="Gold-std coverage")
+    ax2.set_ylim(0, 1.0)
+    ax2.set_yticks([0, 0.25, 0.5])
+    ax2.set_yticklabels(["0%", "25%", "50%"], color="grey", size=6.5)
+    ax2.set_ylabel("Partial corr\ncoverage", color="grey", size=7)
+    ax2.tick_params(colors="grey")
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_color("#cccccc")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(["p=200", "p=500", "p=1000"])
+    ax.set_ylabel("AUPR")
+    ax.set_ylim(0.0, 0.25)
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
+    ax.set_title(title, pad=4, fontweight="bold")
+    ax.legend(loc="upper right", frameon=False, fontsize=7, handlelength=1.4)
+
+
+# ---------------------------------------------------------------------------
+# Panel F — Wall time (log-scale horizontal bars)
+# ---------------------------------------------------------------------------
+
+def _wall_time(ax, data, title):
+    syn513 = data[
+        (data["benchmark"] == "synthetic") & (data["config"] == "n513p164")
+    ]
+    methods = [m for m in METHODS_MAIN if m in syn513["method"].unique()]
+    n = len(methods)
+
+    for i, m in enumerate(reversed(methods)):
+        vals = syn513.loc[syn513["method"] == m, "wall_seconds"].dropna()
         if vals.empty:
             continue
-        med = vals.median()
-        p25, p75 = vals.quantile(0.25), vals.quantile(0.75)
+        med  = vals.median()
+        p25  = vals.quantile(0.25)
+        p75  = vals.quantile(0.75)
         color = PALETTE[m]
-        lw = 2.0 if m == "piglasso" else 0.8
-        ec = "#7B0000" if m == "piglasso" else "#333333"
-        zo = PIGLASSO_ZORDER if m == "piglasso" else BASE_ZORDER
+        lw    = 2.0 if m in PIG_METHODS else 0.8
+        ec    = "#7B0000" if m in PIG_METHODS else "#444444"
+        zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
+
         ax.barh(i, med, color=color, edgecolor=ec, linewidth=lw,
-                zorder=zo, height=0.6)
+                zorder=zo, height=0.55)
         ax.errorbar(med, i, xerr=[[med - p25], [p75 - med]],
-                    fmt="none", color="black", capsize=2.5,
+                    fmt="none", color="#333333", capsize=2.5,
                     capthick=0.8, linewidth=0.8, zorder=zo + 1)
-        if m == "piglasso":
-            ax.barh(i, med, color="none", edgecolor=ec, linewidth=2.2,
-                    zorder=zo + 1, height=0.6)
-            ax.text(p75 + 0.05 * p75, i, "★", va="center",
-                    ha="left", fontsize=9, color="#C00000")
+        if m in PIG_METHODS:
+            ax.barh(i, med, color="none", edgecolor=ec,
+                    linewidth=2.2, zorder=zo + 1, height=0.55)
+            ax.text(p75 * 1.3, i, "★", va="center", ha="left",
+                    fontsize=9, color="#C00000")
+        # Value label
+        ax.text(med * 0.5, i, f"{med:.0f}s", va="center", ha="center",
+                fontsize=6.5, color="white" if m in PIG_METHODS else "#333333",
+                fontweight="bold" if m in PIG_METHODS else "normal")
 
     ax.set_yticks(np.arange(n))
-    ax.set_yticklabels([LABELS[m] for m in reversed(methods_present)])
+    ax.set_yticklabels([LABELS[m] for m in reversed(methods)])
     ax.set_xscale("log")
-    ax.set_xlabel("Wall time (s)")
+    ax.set_xlabel("Wall time (s) — n=513, p=164  [log scale]")
     ax.set_title(title, pad=4, fontweight="bold")
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(
-        lambda v, _: f"{v:.0f}s" if v >= 1 else f"{v:.1f}s"
+        lambda v, _: f"{v:.0f}s" if v >= 1 else f"{v:.2f}s"
     ))
 
 
 # ---------------------------------------------------------------------------
-# Main figure
+# Build full figure
 # ---------------------------------------------------------------------------
 
-def build_figure(syn: pd.DataFrame, d5: pd.DataFrame,
-                 ser: pd.DataFrame, diff: pd.DataFrame):
-    """
-    6-panel Nature-quality figure.
+def build_figure(df: pd.DataFrame) -> plt.Figure:
+    syn  = df[df["benchmark"] == "synthetic"]
+    diff = df[df["benchmark"] == "diffusion"]
 
-    A  Synthetic AUPR by topology (violin)
-    B  Synthetic AUROC by topology (violin)
-    C  Scalability: AUPR vs. problem size (line)
-    D  DREAM5 AUPR bar
-    E  SERGIO AUPR bar (if data available)
-    F  Wall-time benchmark
-    """
-    fig = plt.figure(figsize=(18, 11))
-    gs = GridSpec(2, 3, figure=fig,
-                  hspace=0.52, wspace=0.38,
-                  left=0.07, right=0.97,
-                  top=0.92, bottom=0.10)
+    syn_methods  = [m for m in METHODS_MAIN if m in syn["method"].unique()]
+    diff_methods = [m for m in METHODS_MAIN if m in diff["method"].unique()]
 
-    ax_A = fig.add_subplot(gs[0, 0])
+    fig = plt.figure(figsize=(18, 12))
+    gs  = GridSpec(2, 3, figure=fig,
+                   hspace=0.50, wspace=0.40,
+                   left=0.06, right=0.97,
+                   top=0.91, bottom=0.09)
+
+    # Panel A — radar (polar)
+    ax_A = fig.add_subplot(gs[0, 0], projection="polar")
+    _radar(ax_A, syn, syn_methods,
+           metrics=["aupr", "auroc", "mcc", "f1_opt"],
+           metric_labels=["AUPR", "AUROC", "MCC", "F1$_{opt}$"],
+           title="A   Synthetic — overall performance")
+
+    # Panel B — MCC per topology
     ax_B = fig.add_subplot(gs[0, 1])
+    _violin_topology(ax_B, syn, "mcc", syn_methods,
+                     ylabel="MCC", ylim=(-0.05, 1.05),
+                     title="B   Synthetic — MCC by topology")
+
+    # Panel C — scalability
     ax_C = fig.add_subplot(gs[0, 2])
+    _scalability(ax_C, syn, "aupr", syn_methods,
+                 ylabel="AUPR",
+                 title="C   Scalability — AUPR vs. problem size")
+
+    # Panel D — diffusion per topology
     ax_D = fig.add_subplot(gs[1, 0])
+    _diffusion_topology(ax_D, df, diff_methods,
+                        title="D   Network diffusion recovery by topology")
+
+    # Panel E — DREAM5 line
     ax_E = fig.add_subplot(gs[1, 1])
+    _dream5_line(ax_E, df, title="E   DREAM5 — AUPR vs. gene-set size")
+
+    # Panel F — wall time
     ax_F = fig.add_subplot(gs[1, 2])
+    _wall_time(ax_F, df, title="F   Computational cost (n=513, p=164)")
 
-    topos = ["cluster", "hub", "random", "scale-free"]
-    syn_methods = [m for m in METHODS if m in syn["method"].unique()]
-    dream5_methods = [m for m in METHODS if not d5.empty and m in d5["method"].unique()]
-    sergio_methods = [m for m in METHODS if not ser.empty and m in ser["method"].unique()]
-    diff_methods = [m for m in METHODS if not diff.empty and m in diff["method"].unique()]
-
-    # ------------------------------------------------------------------
-    # Panel A: AUPR by topology
-    # ------------------------------------------------------------------
-    _violin_box(ax_A, syn, "aupr", syn_methods,
-                ylabel="AUPR", title="A   Synthetic — AUPR by topology",
-                ylim=(0.0, 1.05), topology_order=topos)
-    ax_A.axhline(0.0, color="grey", linewidth=0.5, linestyle=":")
-
-    # ------------------------------------------------------------------
-    # Panel B: AUROC by topology
-    # ------------------------------------------------------------------
-    _violin_box(ax_B, syn, "auroc", syn_methods,
-                ylabel="AUROC", title="B   Synthetic — AUROC by topology",
-                ylim=(0.5, 1.05), topology_order=topos)
-    ax_B.axhline(0.5, color="grey", linewidth=0.8, linestyle="--", alpha=0.6,
-                 label="Random chance")
-
-    # ------------------------------------------------------------------
-    # Panel C: Scalability (AUPR vs problem size)
-    # ------------------------------------------------------------------
-    _line_scalability(ax_C, syn, "aupr", syn_methods,
-                      ylabel="AUPR", title="C   Scalability — AUPR vs. problem size")
-    ax_C.legend(loc="lower right", frameon=False, fontsize=7.5)
-
-    # ------------------------------------------------------------------
-    # Panel D: DREAM5
-    # ------------------------------------------------------------------
-    if not d5.empty and dream5_methods:
-        _bar_group(ax_D, d5, "aupr", dream5_methods,
-                   ylabel="AUPR",
-                   title="D   DREAM5 (E. coli in silico)",
-                   ylim=(0.0, 0.35), fmt_pct=False)
-        ax_D.yaxis.set_major_formatter(mticker.FuncFormatter(
-            lambda v, _: f"{v:.2f}"))
-        ax_D.set_xlabel("Gene set: p=200, 500, 1000 (mean ± SEM)", fontsize=7)
-    else:
-        ax_D.text(0.5, 0.5, "DREAM5 data\nnot available",
-                  ha="center", va="center", transform=ax_D.transAxes,
-                  color="grey", fontsize=9)
-        ax_D.set_title("D   DREAM5 (E. coli in silico)", pad=4, fontweight="bold")
-
-    # ------------------------------------------------------------------
-    # Panel E: Diffusion recovery (normalized Spearman) — all 4 methods present
-    # ------------------------------------------------------------------
-    if not diff.empty and diff_methods and "diffusion_spearman_norm" in diff.columns:
-        _bar_group(ax_E, diff, "diffusion_spearman_norm", diff_methods,
-                   ylabel="Normalised Spearman ρ",
-                   title="E   Network diffusion recovery",
-                   ylim=(-0.25, 1.05), fmt_pct=False)
-        ax_E.yaxis.set_major_formatter(mticker.FuncFormatter(
-            lambda v, _: f"{v:.2f}"))
-        ax_E.axhline(0.0, color="grey", linestyle="--",
-                     linewidth=0.8, alpha=0.6, label="Random baseline")
-        ax_E.text(0.98, 0.97, "0 = null baseline,  1 = perfect  (negative = worse than null)",
-                  transform=ax_E.transAxes, ha="right", va="top",
-                  fontsize=6.5, color="grey", style="italic")
-    elif not ser.empty and sergio_methods:
-        ser_npn = ser[ser["preprocessing"] == "log2_npn"] if "preprocessing" in ser.columns else ser
-        if ser_npn.empty:
-            ser_npn = ser
-        _bar_group(ax_E, ser_npn, "aupr", sergio_methods,
-                   ylabel="AUPR",
-                   title="E   SERGIO (single-cell RNA-seq sim.)",
-                   ylim=(0.0, 0.30), fmt_pct=False)
-        ax_E.yaxis.set_major_formatter(mticker.FuncFormatter(
-            lambda v, _: f"{v:.2f}"))
-    else:
-        ax_E.text(0.5, 0.5, "Diffusion / SERGIO\ndata not available",
-                  ha="center", va="center", transform=ax_E.transAxes,
-                  color="grey", fontsize=9)
-        ax_E.set_title("E", pad=4, fontweight="bold")
-
-    # ------------------------------------------------------------------
-    # Panel F: Wall time
-    # ------------------------------------------------------------------
-    _wall_time_bar(ax_F, syn, syn_methods,
-                   title="F   Computational cost (synthetic)")
-
-    # ------------------------------------------------------------------
-    # Shared legend at top
-    # ------------------------------------------------------------------
-    legend_handles = []
-    for m in METHODS:
+    # Shared legend
+    handles = []
+    for m in METHODS_MAIN:
         if m not in syn_methods:
             continue
-        lw = 2.2 if m == "piglasso" else 1.0
-        ec = "#7B0000" if m == "piglasso" else PALETTE[m]
-        patch = mpatches.Patch(
-            facecolor=PALETTE[m], edgecolor=ec, linewidth=lw,
-            label=LABELS[m] + (" ★" if m == "piglasso" else "")
-        )
-        legend_handles.append(patch)
+        lw = 2.2 if m in PIG_METHODS else 1.0
+        ec = "#7B0000" if m in PIG_METHODS else PALETTE[m]
+        label = LABELS[m] + ("  ★" if m in PIG_METHODS else "")
+        handles.append(mpatches.Patch(facecolor=PALETTE[m], edgecolor=ec,
+                                      linewidth=lw, label=label))
 
-    fig.legend(
-        handles=legend_handles,
-        loc="upper center",
-        ncol=len(METHODS),
-        frameon=False,
-        fontsize=9,
-        bbox_to_anchor=(0.5, 1.00),
-        handlelength=1.4,
-        handleheight=0.9,
-        columnspacing=1.6,
-    )
+    fig.legend(handles=handles, loc="upper center", ncol=len(METHODS_MAIN),
+               frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.00),
+               handlelength=1.5, handleheight=0.95, columnspacing=2.0)
 
-    # Super-title
-    fig.suptitle(
-        "NODIS Benchmark — PIGLasso vs. all methods",
-        y=1.03, fontsize=11, fontweight="bold", ha="center"
-    )
+    fig.suptitle("NODIS Benchmark — PIGLasso vs. all methods",
+                 y=1.04, fontsize=12, fontweight="bold")
 
     return fig
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# CLI
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="NODIS benchmark comparison figure")
-    parser.add_argument("--out", default="figures/benchmark_comparison.pdf",
-                        help="Output file path (.pdf or .png)")
+    parser.add_argument("--out", default="figures/benchmark_comparison.pdf")
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 
-    print("Loading synthetic data …")
-    syn = load_synthetic()
-    print(f"  {len(syn):,} rows — methods: {sorted(syn['method'].unique())}")
-
-    print("Loading DREAM5 data …")
-    d5 = load_dream5()
-    print(f"  {len(d5):,} rows")
-
-    print("Loading SERGIO data …")
-    ser = load_sergio()
-    print(f"  {len(ser):,} rows")
-
-    print("Loading diffusion data …")
-    diff = load_diffusion()
-    print(f"  {len(diff):,} rows")
+    print("Loading data …")
+    df = pd.read_csv(SUMMARY_CSV)
+    print(f"  {len(df):,} rows — methods: {sorted(df['method'].unique())}")
 
     print("Building figure …")
-    fig = build_figure(syn, d5, ser, diff)
+    fig = build_figure(df)
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
     print(f"Saved → {args.out}")
 
-    # Also save PNG alongside PDF for quick preview
     if args.out.endswith(".pdf"):
         png_out = args.out.replace(".pdf", ".png")
         fig.savefig(png_out, dpi=150, bbox_inches="tight")
         print(f"Saved → {png_out}")
+
+    plt.close(fig)
 
 
 if __name__ == "__main__":
