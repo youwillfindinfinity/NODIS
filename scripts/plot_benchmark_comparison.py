@@ -61,20 +61,20 @@ matplotlib.rcParams.update({
 # ---------------------------------------------------------------------------
 # Colour + method metadata
 # ---------------------------------------------------------------------------
-METHODS_MAIN = ["desparsified", "glasso", "gglasso", "piglasso"]
+METHODS_MAIN = ["desparsified", "glasso", "gglasso", "piglasso", "piglasso_corr"]
 
 PALETTE = {
     "desparsified": "#5B9BD5",
     "glasso":       "#70AD47",
     "gglasso":      "#FFC000",
-    "piglasso":     "#C00000",   # crimson — PIGLasso highlight
-    "piglasso_corr":"#C00000",
+    "piglasso":     "#7B2D8B",   # purple — SSGLasso (no prior)
+    "piglasso_corr":"#C00000",   # crimson — PIGLasso (with prior)
 }
 LABELS = {
     "desparsified": "Desparsified",
     "glasso":       "GLasso",
     "gglasso":      "GGLasso",
-    "piglasso":     "PIGLasso",
+    "piglasso":     "SSGLasso",
     "piglasso_corr":"PIGLasso",
 }
 PIG_METHODS = {"piglasso", "piglasso_corr"}
@@ -140,13 +140,15 @@ def _radar(ax, data, methods, metrics, metric_labels, title):
     for m in methods:
         vals = norm[m] + norm[m][:1]
         color = PALETTE[m]
-        lw   = 2.4 if m in PIG_METHODS else 1.2
-        zo   = ZO_PIG if m in PIG_METHODS else ZO_BASE
-        alpha_fill = 0.20 if m in PIG_METHODS else 0.06
-        ax.plot(angles, vals, color=color, linewidth=lw,
+        lw    = 2.4 if m in PIG_METHODS else 1.2
+        # piglasso_corr (PIGLasso) on top; piglasso (SSGLasso) just below with dashed line
+        zo    = (ZO_PIG if m == "piglasso_corr" else ZO_PIG - 1) if m in PIG_METHODS else ZO_BASE
+        ls    = "--" if m == "piglasso" else "-"
+        alpha_fill = 0.15 if m in PIG_METHODS else 0.06
+        ax.plot(angles, vals, color=color, linewidth=lw, linestyle=ls,
                 zorder=zo, label=LABELS[m])
         ax.fill(angles, vals, color=color, alpha=alpha_fill, zorder=zo - 1)
-        # Mark PIGLasso vertices
+        # Mark vertices for both PIG methods
         if m in PIG_METHODS:
             ax.scatter(angles[:-1], vals[:-1], color=color, s=25,
                        zorder=zo + 1, edgecolors="white", linewidths=0.8)
@@ -319,17 +321,16 @@ def _dream5_line(ax, data, title):
         ax.set_title(title, pad=4, fontweight="bold")
         return
 
-    # Map piglasso_corr → piglasso for display
-    d5["method_disp"] = d5["method"].replace({"piglasso_corr": "piglasso"})
     # Remove piglasso_string (duplicate) for cleanliness
     d5 = d5[d5["method"] != "piglasso_string"]
 
-    disp_methods = ["desparsified", "glasso", "gglasso", "piglasso"]
+    # Use piglasso_corr directly as PIGLasso; plain piglasso has no dream5 data
+    disp_methods = ["desparsified", "glasso", "gglasso", "piglasso_corr"]
     ps = [200, 500, 1000]
     x  = np.arange(len(ps))
 
     for m in disp_methods:
-        sub = d5[d5["method_disp"] == m]
+        sub = d5[d5["method"] == m]
         mus = [sub.loc[sub["p"] == p, "aupr"].mean() for p in ps]
         color = PALETTE[m]
         lw    = 2.4 if m in PIG_METHODS else 1.3
