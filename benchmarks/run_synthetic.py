@@ -39,7 +39,9 @@ def main() -> None:
     parser.add_argument("--method", required=True,
                         choices=["desparsified", "glasso", "gglasso", "silggm_r",
                                  "piglasso", "piglasso_adaptive", "piglasso_corr",
-                                 "piglasso_oracle"])
+                                 "piglasso_oracle",
+                                 "piglasso_oracle_n01", "piglasso_oracle_n02",
+                                 "piglasso_oracle_n03", "piglasso_oracle_n00"])
     parser.add_argument("--rep", type=int, required=True)
     parser.add_argument("--out", default="results/raw/")
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -134,13 +136,19 @@ def main() -> None:
         adj = est.get_adjacency()
         scores = est.precision_
 
-    elif args.method == "piglasso_oracle":
+    elif args.method in ("piglasso_oracle",
+                         "piglasso_oracle_n00", "piglasso_oracle_n01",
+                         "piglasso_oracle_n02", "piglasso_oracle_n03"):
         from nodis.estimators.piglasso import PIGLassoEstimator
         from nodis.estimators.prior_utils import build_noisy_oracle_prior
+        # Noise level encoded in method name (n00=0.0, n01=0.1, n02=0.2, n03=0.3)
+        # Falls back to --prior-noise arg when method == "piglasso_oracle"
+        noise_map = {"piglasso_oracle_n00": 0.0, "piglasso_oracle_n01": 0.1,
+                     "piglasso_oracle_n02": 0.2, "piglasso_oracle_n03": 0.3}
+        noise = noise_map.get(args.method, args.prior_noise)
         adj_true_bin = (data.Omega != 0).astype(float)
         np.fill_diagonal(adj_true_bin, 0)
-        prior = build_noisy_oracle_prior(adj_true_bin, noise=args.prior_noise,
-                                         seed=args.rep)
+        prior = build_noisy_oracle_prior(adj_true_bin, noise=noise, seed=args.rep)
         est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
         est.fit(data.X, prior=prior)
         adj = est.get_adjacency()

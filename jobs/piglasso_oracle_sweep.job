@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32768M            # 32 GB — 8 GB/task for 4 parallel tasks
-#SBATCH --array=0-74            # 75 jobs × 8 tasks = 600 (4 topos × 3 noise × 50 reps)
+#SBATCH --array=0-99            # 100 jobs × 8 tasks = 800 (4 topos × 4 noise levels × 50 reps)
 # Method: piglasso_oracle — sensitivity sweep on n513p164 only
 # Noise levels: 0.1, 0.2, 0.3 (10%, 20%, 30% of edge labels flipped)
 # Grid: 4 topologies × 3 noise levels × 50 reps = 600 tasks
@@ -14,39 +14,41 @@
 # Submit:
 #   sbatch --partition=rome jobs/piglasso_oracle_sweep.job
 
-[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
-source "$HOME/NODIS/.venv/bin/activate"
+NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
 
 TOPOS=("hub" "scale-free" "cluster" "random")
-NOISES=(0.1 0.2 0.3)
+# noise encoded in method name: n00=0.0 (perfect oracle), n01=0.1, n02=0.2, n03=0.3
+METHODS=("piglasso_oracle_n00" "piglasso_oracle_n01" "piglasso_oracle_n02" "piglasso_oracle_n03")
 N_REPS=50
-TOTAL=600           # 4 × 3 × 50
+TOTAL=800           # 4 topos × 4 noise levels × 50 reps
 TASKS_PER_JOB=8
 
-mkdir -p "$HOME/NODIS/results/raw" "$HOME/NODIS/logs"
+mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
 
 for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
     FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
     [[ $FLAT -ge $TOTAL ]] && break
 
-    TOPO_IDX=$(( FLAT / (3 * N_REPS) ))
-    REM1=$(( FLAT % (3 * N_REPS) ))
-    NOISE_IDX=$(( REM1 / N_REPS ))
+    TOPO_IDX=$(( FLAT / (4 * N_REPS) ))
+    REM1=$(( FLAT % (4 * N_REPS) ))
+    METH_IDX=$(( REM1 / N_REPS ))
     REP=$(( REM1 % N_REPS ))
 
     TOPO=${TOPOS[$TOPO_IDX]}
-    NOISE=${NOISES[$NOISE_IDX]}
+    METHOD=${METHODS[$METH_IDX]}
 
-    echo "[$FLAT] topology=${TOPO} config=n513p164 method=piglasso_oracle noise=${NOISE} rep=${REP}"
+    echo "[$FLAT] topology=${TOPO} config=n513p164 method=${METHOD} rep=${REP}"
 
-    python "$HOME/NODIS/benchmarks/run_synthetic.py" \
-        --topology     "$TOPO"           \
-        --config       n513p164          \
-        --method       piglasso_oracle   \
-        --rep          "$REP"            \
-        --prior-noise  "$NOISE"          \
-        --prior-weight 0.5               \
-        --out          "$HOME/NODIS/results/raw/" &
+    python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+        --topology     "$TOPO"    \
+        --config       n513p164   \
+        --method       "$METHOD"  \
+        --rep          "$REP"     \
+        --prior-weight 0.5        \
+        --out          "$NODIS_DIR/results/raw/" &
 done
 
 wait
