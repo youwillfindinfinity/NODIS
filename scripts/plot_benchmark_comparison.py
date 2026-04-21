@@ -61,23 +61,23 @@ matplotlib.rcParams.update({
 # ---------------------------------------------------------------------------
 # Colour + method metadata
 # ---------------------------------------------------------------------------
-METHODS_MAIN = ["desparsified", "glasso", "gglasso", "piglasso", "piglasso_corr"]
+METHODS_MAIN = ["desparsified", "glasso", "gglasso", "ssglasso", "piglasso_corr"]
 
 PALETTE = {
     "desparsified": "#5B9BD5",
     "glasso":       "#70AD47",
     "gglasso":      "#FFC000",
-    "piglasso":     "#7B2D8B",   # purple — SSGLasso (no prior)
+    "ssglasso":     "#7B2D8B",   # purple — SSGLasso (no prior)
     "piglasso_corr":"#C00000",   # crimson — PIGLasso (with prior)
 }
 LABELS = {
     "desparsified": "Desparsified",
     "glasso":       "GLasso",
     "gglasso":      "GGLasso",
-    "piglasso":     "SSGLasso",
+    "ssglasso":     "SSGLasso",
     "piglasso_corr":"PIGLasso",
 }
-PIG_METHODS = {"piglasso", "piglasso_corr"}
+PIG_METHODS = {"ssglasso", "piglasso_corr"}
 ZO_PIG   = 5
 ZO_BASE  = 2
 
@@ -141,9 +141,9 @@ def _radar(ax, data, methods, metrics, metric_labels, title):
         vals = norm[m] + norm[m][:1]
         color = PALETTE[m]
         lw    = 2.4 if m in PIG_METHODS else 1.2
-        # piglasso_corr (PIGLasso) on top; piglasso (SSGLasso) just below with dashed line
+        # piglasso_corr (PIGLasso) on top; ssglasso (SSGLasso) just below with dashed line
         zo    = (ZO_PIG if m == "piglasso_corr" else ZO_PIG - 1) if m in PIG_METHODS else ZO_BASE
-        ls    = "--" if m == "piglasso" else "-"
+        ls    = "--" if m == "ssglasso" else "-"
         alpha_fill = 0.15 if m in PIG_METHODS else 0.06
         ax.plot(angles, vals, color=color, linewidth=lw, linestyle=ls,
                 zorder=zo, label=LABELS[m])
@@ -202,7 +202,7 @@ def _violin_topology(ax, data, metric, methods, ylabel, title, ylim=None):
                        edgecolors=color, linewidths=lw, zorder=zo + 2)
 
     ax.set_xticks(np.arange(n_topo))
-    ax.set_xticklabels([t.replace("-", "\u2011") for t in topos])  # non-breaking hyphen
+    ax.set_xticklabels([t for t in topos])  # non-breaking hyphen
     ax.set_ylabel(ylabel)
     ax.set_title(title, pad=4, fontweight="bold")
     if ylim:
@@ -298,7 +298,7 @@ def _diffusion_topology(ax, data, methods, title):
                        linewidth=2.0, zorder=zo + 1)
 
     ax.set_xticks(np.arange(n_topo))
-    ax.set_xticklabels([t.replace("-", "\u2011") for t in topos])
+    ax.set_xticklabels([t for t in topos])
     ax.axhline(0, color="#999999", linewidth=0.8, linestyle="--", alpha=0.7)
     ax.set_ylabel("Normalised Spearman ρ")
     ax.set_title(title, pad=4, fontweight="bold")
@@ -394,8 +394,6 @@ def _wall_time(ax, data, title):
         if m in PIG_METHODS:
             ax.barh(i, med, color="none", edgecolor=ec,
                     linewidth=2.2, zorder=zo + 1, height=0.55)
-            ax.text(p75 * 1.3, i, "★", va="center", ha="left",
-                    fontsize=9, color="#C00000")
         # Value label
         ax.text(med * 0.5, i, f"{med:.0f}s", va="center", ha="center",
                 fontsize=6.5, color="white" if m in PIG_METHODS else "#333333",
@@ -467,7 +465,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
             continue
         lw = 2.2 if m in PIG_METHODS else 1.0
         ec = "#7B0000" if m in PIG_METHODS else PALETTE[m]
-        label = LABELS[m] + ("  ★" if m in PIG_METHODS else "")
+        label = LABELS[m]
         handles.append(mpatches.Patch(facecolor=PALETTE[m], edgecolor=ec,
                                       linewidth=lw, label=label))
 

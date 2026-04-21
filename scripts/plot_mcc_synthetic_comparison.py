@@ -60,25 +60,25 @@ matplotlib.rcParams.update({
 # Colour + method metadata
 # ---------------------------------------------------------------------------
 METHODS_ORDER = ["glasso", "desparsified", "gglasso",
-                 "piglasso", "piglasso_oracle_n02"]
+                 "ssglasso", "piglasso"]
 
 PALETTE = {
-    "glasso":             "#4C72B0",
-    "desparsified":       "#F78154",
-    "gglasso":            "#4D9078",
-    "piglasso":           "#F2C14E",   # SSGLasso (no prior)
-    "piglasso_oracle_n02":"#B4436C",   # PIGLasso (oracle 20%)
+    "glasso":     "#4C72B0",
+    "desparsified":"#F78154",
+    "gglasso":    "#5CAD6E",
+    "ssglasso":   "#F2C14E",   # SSGLasso (no prior)
+    "piglasso":   "#B4436C",   # PIGLasso (with prior)
 }
 LABELS = {
-    "glasso":             "GLasso",
-    "desparsified":       "Desparsified",
-    "gglasso":            "GGLasso",
-    "piglasso":           "SSGLasso",
-    "piglasso_oracle_n02":"PIGLasso\n(oracle 20%)",
+    "glasso":     "GLasso",
+    "desparsified":"Desparsified",
+    "gglasso":    "GGLasso",
+    "ssglasso":   "SSGLasso",
+    "piglasso":   "PIGLasso",
 }
 # Methods drawn with highlighted style
-PIG_METHODS   = {"piglasso", "piglasso_oracle_n02"}
-ORACLE_METHOD = "piglasso_oracle_n02"
+PIG_METHODS   = {"ssglasso", "piglasso"}
+ORACLE_METHOD = "piglasso"
 
 ZO_PIG  = 5
 ZO_BASE = 2
@@ -190,7 +190,7 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
                     fontweight="bold" if m in PIG_METHODS else "normal")
 
     ax.set_xticks(np.arange(n_topo))
-    ax.set_xticklabels([t.replace("-", "\u2011") for t in TOPOS])
+    ax.set_xticklabels([t for t in TOPOS])
     ax.set_ylabel("MCC")
     ax.set_ylim(0, 1.00)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
@@ -226,7 +226,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     for m in methods_legend:
         lw    = 1.0
         ec    = PALETTE[m]
-        label = LABELS[m].replace("\n", " ") + ("  \u2605" if m in PIG_METHODS else "")
+        label = LABELS[m].replace("\n", " ")
         handles.append(mpatches.Patch(facecolor=PALETTE[m], edgecolor=ec,
                                       linewidth=lw, label=label))
 

@@ -45,19 +45,21 @@ matplotlib.rcParams.update({
 })
 
 PALETTE = {
-    "desparsified": "#5B9BD5",
-    "glasso":       "#70AD47",
-    "gglasso":      "#FFC000",
-    "piglasso":     "#C00000",
+    "glasso":       "#4C72B0",
+    "desparsified": "#F78154",
+    "gglasso":      "#5CAD6E",
+    "ssglasso":     "#F2C14E",
+    "piglasso":     "#B4436C",
 }
 LABELS = {
     "desparsified": "Desparsified",
     "glasso":       "GLasso",
     "gglasso":      "GGLasso",
+    "ssglasso":     "SSGLasso",
     "piglasso":     "PIGLasso",
 }
-METHODS = ["desparsified", "glasso", "gglasso", "piglasso"]
-PIG_METHODS = {"piglasso"}
+METHODS = ["desparsified", "glasso", "gglasso", "ssglasso", "piglasso"]
+PIG_METHODS = {"ssglasso", "piglasso"}
 ZO_PIG = 5
 ZO_BASE = 2
 
@@ -86,7 +88,7 @@ def _heatmap(ax, diff):
     im = ax.imshow(mat, cmap="RdYlGn", vmin=0.0, vmax=0.75, aspect="auto")
     ax.set_xticks(np.arange(len(TOPOS)))
     ax.set_yticks(np.arange(len(methods)))
-    ax.set_xticklabels([t.replace("-", "\u2011") for t in TOPOS], size=8)
+    ax.set_xticklabels([t for t in TOPOS], size=8)
     ax.set_yticklabels([LABELS[m] for m in methods], size=8)
 
     # Annotate cells
@@ -99,9 +101,8 @@ def _heatmap(ax, diff):
             # Bold + star for PIGLasso; mark best per column
             best_in_col = max(mat[m_i, ti] for m_i in range(len(methods))
                               if not np.isnan(mat[m_i, ti]))
-            star = "★" if (is_pig and abs(v - best_in_col) < 0.001) else ""
             txt_color = "white" if (v < 0.15 or v > 0.55) else "black"
-            ax.text(ti, mi, f"{v:.2f}{star}", ha="center", va="center",
+            ax.text(ti, mi, f"{v:.2f}", ha="center", va="center",
                     fontsize=8, color=txt_color,
                     fontweight="bold" if is_pig else "normal")
 
@@ -109,13 +110,14 @@ def _heatmap(ax, diff):
     cb.set_label("Normalised Spearman ρ", size=8)
     cb.ax.tick_params(labelsize=7)
 
-    # Highlight PIGLasso row
-    if "piglasso" in methods:
-        pig_idx = methods.index("piglasso")
-        rect = plt.Rectangle((-0.5, pig_idx - 0.5), len(TOPOS), 1,
-                              fill=False, edgecolor="#C00000",
-                              linewidth=2.2, clip_on=False, zorder=5)
-        ax.add_patch(rect)
+    # Highlight PIGLasso rows
+    for pig_m, pig_color in [("piglasso", "#B4436C"), ("ssglasso", "#F78154")]:
+        if pig_m in methods:
+            pig_idx = methods.index(pig_m)
+            rect = plt.Rectangle((-0.5, pig_idx - 0.5), len(TOPOS), 1,
+                                  fill=False, edgecolor=pig_color,
+                                  linewidth=2.2, clip_on=False, zorder=5)
+            ax.add_patch(rect)
 
     ax.set_title("A   Diffusion recovery — normalised Spearman ρ\n"
                  "(mean across 3 configs × 3 δ-modes × 50 reps)",
@@ -203,7 +205,7 @@ def _knockout_bar(ax, diff):
             xp    = ti + offsets[mi]
             color = PALETTE[m]
             lw    = 1.8 if m in PIG_METHODS else 0.7
-            ec    = "#7B0000" if m in PIG_METHODS else "#444444"
+            ec    = PALETTE[m] if m in PIG_METHODS else "#444444"
             zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
             ax.bar(xp, mu, bw * 0.86, color=color, edgecolor=ec,
                    linewidth=lw, zorder=zo)
@@ -214,7 +216,7 @@ def _knockout_bar(ax, diff):
                        linewidth=2.0, zorder=zo + 1)
 
     ax.set_xticks(np.arange(n_topo))
-    ax.set_xticklabels([t.replace("-", "\u2011") for t in TOPOS])
+    ax.set_xticklabels([t for t in TOPOS])
     ax.set_ylabel("Knockout top-10 recall")
     ax.axhline(10 / 50, color="#aaaaaa", linewidth=0.7, linestyle=":",
                label=f"Random ({10/50:.2f})")
@@ -258,7 +260,7 @@ def _diffusion_vs_aupr(ax, df):
 
         color = PALETTE[m]
         ms    = 60  if m in PIG_METHODS else 30
-        ec    = "#7B0000" if m in PIG_METHODS else color
+        ec    = PALETTE[m] if m in PIG_METHODS else color
         ew    = 1.5 if m in PIG_METHODS else 0.5
         zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
         ax.scatter(xs, ys, color=color, s=ms, edgecolors=ec, linewidths=ew,
@@ -315,8 +317,8 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     methods = [m for m in METHODS if m in diff["method"].unique()]
     for m in methods:
         lw = 2.2 if m in PIG_METHODS else 1.0
-        ec = "#7B0000" if m in PIG_METHODS else PALETTE[m]
-        label = LABELS[m] + ("  ★" if m in PIG_METHODS else "")
+        ec = PALETTE[m] if m in PIG_METHODS else PALETTE[m]
+        label = LABELS[m]
         handles.append(mpatches.Patch(facecolor=PALETTE[m], edgecolor=ec,
                                       linewidth=lw, label=label))
 
