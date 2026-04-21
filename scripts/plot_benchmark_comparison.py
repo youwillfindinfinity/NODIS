@@ -82,6 +82,7 @@ ZO_PIG   = 5
 ZO_BASE  = 2
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
+FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
 
 
@@ -485,7 +486,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
 
 def main():
     parser = argparse.ArgumentParser(description="NODIS benchmark comparison figure")
-    parser.add_argument("--out", default="figures/benchmark_comparison.pdf")
+    parser.add_argument("--out", default=os.path.join(FIGURES_DIR, "benchmark_comparison.pdf"))
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 

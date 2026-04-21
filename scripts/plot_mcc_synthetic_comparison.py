@@ -88,6 +88,7 @@ CONFIGS_SMALL3 = ["n100p50", "n237p78", "n513p164"]
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
+FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +248,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="figures/mcc_synthetic_comparison.pdf")
+    parser.add_argument("--out", default=os.path.join(FIGURES_DIR, "mcc_synthetic_comparison.pdf"))
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 

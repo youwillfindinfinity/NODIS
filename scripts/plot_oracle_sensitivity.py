@@ -59,6 +59,7 @@ matplotlib.rcParams.update({
 # ---------------------------------------------------------------------------
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
+FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 
 TOPOS = ["cluster", "hub", "random", "scale-free"]
 TOPO_PALETTE = {
@@ -185,8 +186,8 @@ def _save(fig, path, dpi):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-aupr", default="figures/oracle_sensitivity_aupr.pdf")
-    parser.add_argument("--out-mcc",  default="figures/oracle_sensitivity_mcc.pdf")
+    parser.add_argument("--out-aupr", default=os.path.join(FIGURES_DIR, "oracle_sensitivity_aupr.pdf"))
+    parser.add_argument("--out-mcc",  default=os.path.join(FIGURES_DIR, "oracle_sensitivity_mcc.pdf"))
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 
