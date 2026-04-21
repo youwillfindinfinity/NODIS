@@ -479,8 +479,8 @@ def draw_gif(genes, degree, edges, pos, out_path, n_frames=90, fps=3):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-static", default="figures/burns_network.pdf")
-    parser.add_argument("--out-gif",    default="figures/burns_network.gif")
+    parser.add_argument("--out-static", default=os.path.join(FIGURES_DIR, "burns_network.pdf"))
+    parser.add_argument("--out-gif",    default=os.path.join(FIGURES_DIR, "burns_network.gif"))
     parser.add_argument("--no-gif",     action="store_true")
     parser.add_argument("--frames",     type=int, default=90)
     parser.add_argument("--fps",        type=int, default=3)
