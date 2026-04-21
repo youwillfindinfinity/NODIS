@@ -64,7 +64,7 @@ TOPOS = ["cluster", "hub", "random", "scale-free"]
 TOPO_PALETTE = {
     "cluster":    "#4C72B0",
     "hub":        "#F78154",
-    "random":     "#4D9078",
+    "random":     "#5CAD6E",
     "scale-free": "#B4436C",
 }
 TOPO_MARKERS = {
@@ -114,13 +114,13 @@ def _oracle_panel(ax, data, metric, ylabel, title):
         sem = np.array(sems)
 
         ax.plot(NOISE_X, mu, color=color, lw=2.0, marker=marker,
-                ms=6, zorder=4, label=topo.replace("-", "\u2011"))
+                ms=6, zorder=4, label=topo)
         ax.fill_between(NOISE_X, mu - sem, mu + sem,
                         color=color, alpha=0.12, zorder=3)
 
         # SSGLasso baseline (dashed horizontal)
         base = syn.loc[
-            (syn["method"] == "piglasso") & (syn["topology"] == topo), metric
+            (syn["method"] == "ssglasso") & (syn["topology"] == topo), metric
         ].dropna().mean()
         if not np.isnan(base):
             ax.axhline(base, color=color, lw=1.0, linestyle="--",
@@ -151,7 +151,7 @@ def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
     topo_handles = [
         Line2D([0], [0], color=TOPO_PALETTE[t], lw=2.0,
                marker=TOPO_MARKERS[t], ms=6,
-               label=t.replace("-", "\u2011"))
+               label=t)
         for t in TOPOS
     ]
     baseline_handle = Line2D([0], [0], color="grey", lw=1.0,

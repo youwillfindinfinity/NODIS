@@ -49,7 +49,9 @@ _COLUMNS = [
 N_NULL = 5  # random graphs averaged for null baseline
 
 
-def _fit_estimator(method: str, X: np.ndarray, alpha: float, n_jobs: int):
+def _fit_estimator(method: str, X: np.ndarray, alpha: float, n_jobs: int,
+                   adj_true: np.ndarray = None, seed: int = 0,
+                   prior_noise: float = 0.2):
     """Fit estimator and return (adj, scores)."""
     if method == "desparsified":
         from nodis.estimators.desparsified import DesparifiedGGM
@@ -69,10 +71,20 @@ def _fit_estimator(method: str, X: np.ndarray, alpha: float, n_jobs: int):
         est.fit(X)
         return est.get_adjacency(), np.abs(est.precision_)
 
-    if method == "piglasso":
+    if method == "ssglasso":
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=n_jobs)
         est.fit(X)
+        return est.get_adjacency(), est.precision_
+
+    if method == "piglasso":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        from nodis.estimators.prior_utils import build_noisy_oracle_prior
+        adj_true_bin = (adj_true != 0).astype(float)
+        np.fill_diagonal(adj_true_bin, 0)
+        prior = build_noisy_oracle_prior(adj_true_bin, noise=prior_noise, seed=seed)
+        est = PIGLassoEstimator(n_jobs=n_jobs, prior_weight=0.5)
+        est.fit(X, prior=prior)
         return est.get_adjacency(), est.precision_
 
     raise ValueError(f"Unknown method: {method!r}")
@@ -182,7 +194,10 @@ def main() -> None:
                         choices=["hub", "scale-free", "cluster", "random"])
     parser.add_argument("--config",    required=True, choices=list(CONFIGS))
     parser.add_argument("--method",    required=True,
-                        choices=["desparsified", "glasso", "gglasso", "piglasso"])
+                        choices=["desparsified", "glasso", "gglasso",
+                                 "ssglasso", "piglasso"])
+    parser.add_argument("--prior-noise", type=float, default=0.2,
+                        help="Fraction of prior edges to flip (piglasso only).")
     parser.add_argument("--rep",       type=int, required=True)
     parser.add_argument("--mode",      default="both",
                         choices=["diffusion", "knockout", "both"])
@@ -214,7 +229,7 @@ def main() -> None:
     n, p = CONFIGS[args.config]
 
     # Determine which delta modes to evaluate
-    if args.method == "piglasso":
+    if args.method in ("ssglasso", "piglasso"):
         delta_modes = ["random"]
     elif args.delta == "all":
         delta_modes = ["random", "hub", "fiedler"]
@@ -258,7 +273,9 @@ def main() -> None:
             adj_pred = pickle.load(fh)
         print(f"Loaded adj from pickle: {adj_pickle}")
     else:
-        adj_pred, _ = _fit_estimator(args.method, data.X, args.alpha, args.n_jobs)
+        adj_pred, _ = _fit_estimator(args.method, data.X, args.alpha, args.n_jobs,
+                                     adj_true=data.Omega, seed=seed,
+                                     prior_noise=args.prior_noise)
 
     fit_wall = time.perf_counter() - t0
 
