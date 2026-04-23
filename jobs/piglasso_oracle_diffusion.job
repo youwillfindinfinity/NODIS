@@ -46,7 +46,7 @@ for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
         --rep      "$REP"    \
         --delta    all       \
         --mode     both      \
-        --n-jobs   4         \
+        --n-jobs   1         \
         --out      "$HOME/NODIS/results/diffusion/" &
 done
 
