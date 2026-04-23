@@ -1,0 +1,53 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_ssg_diff
+#SBATCH --output=/home/zblei/NODIS/logs/ssg_diff_%A_%a.out
+#SBATCH --error=/home/zblei/NODIS/logs/ssg_diff_%A_%a.err
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M
+#SBATCH --array=0-37             # 38 × 16 = 608 slots (covers 600 tasks)
+# Submit with:
+#   sbatch --partition=rome --time=04:00:00 jobs/ssglasso_diffusion.job
+#
+# Task space: 4 topologies × 3 configs × 50 reps = 600
+# Method: ssglasso (no prior)
+# Delta mode: all (fiedler, hub, random)
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+METHOD="ssglasso"
+N_REPS=50
+TOTAL=600          # 4 × 3 × 50
+TASKS_PER_JOB=${SLURM_CPUS_PER_TASK}
+
+mkdir -p "$HOME/NODIS/results/diffusion" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    TOPO_IDX=$(( FLAT / (3 * N_REPS) ))
+    REM1=$(( FLAT % (3 * N_REPS) ))
+    CFG_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    TOPO=${TOPOS[$TOPO_IDX]}
+    CFG=${CONFIGS[$CFG_IDX]}
+
+    echo "[$FLAT] topology=${TOPO} config=${CFG} method=${METHOD} rep=${REP}"
+
+    python "$HOME/NODIS/benchmarks/run_diffusion.py" \
+        --topology "$TOPO"   \
+        --config   "$CFG"    \
+        --method   "$METHOD" \
+        --rep      "$REP"    \
+        --delta    all       \
+        --mode     both      \
+        --n-jobs   4         \
+        --out      "$HOME/NODIS/results/diffusion/" &
+done
+
+wait
