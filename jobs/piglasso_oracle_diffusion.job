@@ -11,7 +11,7 @@
 #
 # Task space: 4 topologies × 3 configs × 50 reps = 600
 # Method: piglasso (oracle prior, --prior-noise 0.2 default, prior_weight=0.5)
-# Delta mode forced to "random" (same as piglasso)
+# Delta mode: all (fiedler, hub, random) — matches other method jobs
 
 [[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
 source "$HOME/NODIS/.venv/bin/activate"
@@ -44,7 +44,7 @@ for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
         --config   "$CFG"    \
         --method   "$METHOD" \
         --rep      "$REP"    \
-        --delta    random    \
+        --delta    all       \
         --mode     both      \
         --n-jobs   4         \
         --out      "$HOME/NODIS/results/diffusion/" &
