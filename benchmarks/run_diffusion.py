@@ -229,9 +229,7 @@ def main() -> None:
     n, p = CONFIGS[args.config]
 
     # Determine which delta modes to evaluate
-    if args.method in ("ssglasso", "piglasso"):
-        delta_modes = ["random"]
-    elif args.delta == "all":
+    if args.delta == "all":
         delta_modes = ["random", "hub", "fiedler"]
     else:
         delta_modes = [args.delta]
