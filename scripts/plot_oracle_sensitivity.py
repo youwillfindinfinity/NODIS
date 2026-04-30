@@ -75,10 +75,10 @@ TOPO_MARKERS = {
     "scale-free": "D",
 }
 
-# Oracle noise levels in order (x-axis)
-ORACLE_METHODS = ["piglasso_oracle_n00", "piglasso_oracle_n01",
-                  "piglasso_oracle_n02", "piglasso_oracle_n03"]
-NOISE_LABELS   = ["0%\n(perfect)", "10%", "20%", "30%"]
+# Oracle noise levels in order (x-axis) — 0% to 100% in steps of 10%
+ORACLE_METHODS = [f"piglasso_oracle_n{i:02d}" for i in range(11)]
+NOISE_LABELS   = ["0%\n(perfect)", "10%", "20%", "30%", "40%",
+                  "50%\n(random)", "60%", "70%", "80%", "90%", "100%"]
 NOISE_X        = np.arange(len(ORACLE_METHODS))
 
 SSGLASSO_COLOR = "#7B2D8B"   # purple, matches main benchmark plot
