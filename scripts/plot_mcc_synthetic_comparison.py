@@ -38,12 +38,12 @@ warnings.filterwarnings("ignore")
 matplotlib.rcParams.update({
     "font.family":        "sans-serif",
     "font.sans-serif":    ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size":          8,
-    "axes.labelsize":     9,
-    "axes.titlesize":     9.5,
-    "xtick.labelsize":    7.5,
-    "ytick.labelsize":    7.5,
-    "legend.fontsize":    8,
+    "font.size":          12,
+    "axes.labelsize":     13,
+    "axes.titlesize":     14,
+    "xtick.labelsize":    12,
+    "ytick.labelsize":    12,
+    "legend.fontsize":    12,
     "figure.dpi":         300,
     "axes.spines.top":    False,
     "axes.spines.right":  False,
@@ -232,12 +232,12 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                                       linewidth=lw, label=label))
 
     fig.legend(handles=handles, loc="upper center",
-               ncol=len(handles), frameon=False, fontsize=8.5,
+               ncol=len(handles), frameon=False, fontsize=13,
                bbox_to_anchor=(0.5, 1.00),
                handlelength=1.5, handleheight=0.95, columnspacing=1.8)
 
     fig.suptitle("Synthetic benchmark \u2014 MCC comparison",
-                 y=1.05, fontsize=11, fontweight="bold")
+                 y=1.05, fontsize=17, fontweight="bold")
 
     return fig
 

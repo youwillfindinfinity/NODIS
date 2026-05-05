@@ -6,10 +6,10 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32768M            # 32 GB — 8 GB/task for 4 parallel tasks
-#SBATCH --array=0-174           # 175 jobs × 8 tasks = 1400 (4 topos × 7 new noise levels × 50 reps)
+#SBATCH --array=0-199           # 200 jobs × 8 tasks = 1600 (4 topos × 8 missing noise levels × 50 reps)
 # Method: piglasso_oracle — sensitivity sweep on n513p164 only
-# Noise levels: 0.1, 0.2, 0.3 (10%, 20%, 30% of edge labels flipped)
-# Grid: 4 topologies × 3 noise levels × 50 reps = 600 tasks
+# Missing levels: n02 (20%) + n04-n10 (40%-100%) = 8 levels
+# Grid: 4 topologies × 8 noise levels × 50 reps = 1600 tasks
 #
 # Submit:
 #   sbatch --partition=rome jobs/piglasso_oracle_sweep.job
@@ -20,12 +20,12 @@ NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
 source "$NODIS_DIR/.venv/bin/activate"
 
 TOPOS=("hub" "scale-free" "cluster" "random")
-# Only the NEW levels — n00..n03 already completed
-METHODS=("piglasso_oracle_n04" "piglasso_oracle_n05" "piglasso_oracle_n06"
-         "piglasso_oracle_n07" "piglasso_oracle_n08" "piglasso_oracle_n09"
-         "piglasso_oracle_n10")
+# Missing levels — n00, n01, n03 already completed; n02 + n04..n10 are new
+METHODS=("piglasso_oracle_n02" "piglasso_oracle_n04" "piglasso_oracle_n05"
+         "piglasso_oracle_n06" "piglasso_oracle_n07" "piglasso_oracle_n08"
+         "piglasso_oracle_n09" "piglasso_oracle_n10")
 N_REPS=50
-TOTAL=1400          # 4 topos × 7 new noise levels × 50 reps
+TOTAL=1600          # 4 topos × 8 missing noise levels × 50 reps
 TASKS_PER_JOB=8
 
 mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
@@ -34,8 +34,8 @@ for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
     FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
     [[ $FLAT -ge $TOTAL ]] && break
 
-    TOPO_IDX=$(( FLAT / (7 * N_REPS) ))
-    REM1=$(( FLAT % (7 * N_REPS) ))
+    TOPO_IDX=$(( FLAT / (8 * N_REPS) ))
+    REM1=$(( FLAT % (8 * N_REPS) ))
     METH_IDX=$(( REM1 / N_REPS ))
     REP=$(( REM1 % N_REPS ))
 

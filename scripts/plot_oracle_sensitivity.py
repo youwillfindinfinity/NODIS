@@ -36,12 +36,12 @@ warnings.filterwarnings("ignore")
 matplotlib.rcParams.update({
     "font.family":        "sans-serif",
     "font.sans-serif":    ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size":          8,
-    "axes.labelsize":     9,
-    "axes.titlesize":     9.5,
-    "xtick.labelsize":    7.5,
-    "ytick.labelsize":    7.5,
-    "legend.fontsize":    8,
+    "font.size":          12,
+    "axes.labelsize":     13,
+    "axes.titlesize":     14,
+    "xtick.labelsize":    12,
+    "ytick.labelsize":    12,
+    "legend.fontsize":    12,
     "figure.dpi":         300,
     "axes.spines.top":    False,
     "axes.spines.right":  False,
@@ -131,7 +131,8 @@ def _oracle_panel(ax, data, metric, ylabel, title):
     ax.set_xticklabels(NOISE_LABELS)
     ax.set_xlabel("Prior noise level (fraction of edges flipped)")
     ax.set_ylabel(ylabel)
-    ax.set_title(title, pad=6, fontweight="bold")
+    if title:
+        ax.set_title(title, pad=6, fontsize=13, fontweight="normal", color="black")
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda v, _: f"{v:.2f}")
     )
@@ -143,7 +144,7 @@ def _oracle_panel(ax, data, metric, ylabel, title):
 
 def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
                         panel_title: str) -> plt.Figure:
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(11, 5))
     fig.subplots_adjust(left=0.12, right=0.97, top=0.80, bottom=0.18)
 
     _oracle_panel(ax, df, metric, ylabel, title=panel_title)
@@ -159,12 +160,12 @@ def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
                               linestyle="--", label="SSGLasso baseline (no prior)")
 
     fig.legend(handles=topo_handles + [baseline_handle],
-               loc="upper center", ncol=5, frameon=False, fontsize=8.5,
+               loc="upper center", ncol=5, frameon=False, fontsize=13,
                bbox_to_anchor=(0.5, 1.00),
                handlelength=1.8, columnspacing=2.0)
 
-    fig.suptitle("PIGLasso oracle prior sensitivity sweep",
-                 y=1.03, fontsize=10, fontweight="bold")
+    fig.suptitle("PIGLasso prior noise sensitivity sweep",
+                 y=1.12, fontsize=17, fontweight="bold")
 
     return fig
 
