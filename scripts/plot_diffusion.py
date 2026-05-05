@@ -31,11 +31,12 @@ warnings.filterwarnings("ignore")
 matplotlib.rcParams.update({
     "font.family":     "sans-serif",
     "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size":       8,
-    "axes.labelsize":  9,
-    "axes.titlesize":  9.5,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
+    "font.size":       12,
+    "axes.labelsize":  13,
+    "axes.titlesize":  14,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "legend.fontsize": 12,
     "figure.dpi":      300,
     "axes.spines.top": False,
     "axes.spines.right": False,
@@ -86,11 +87,14 @@ def _heatmap(ax, diff):
             ].dropna()
             mat[mi, ti] = vals.mean() if len(vals) else np.nan
 
-    im = ax.imshow(mat, cmap="RdYlGn", vmin=0.0, vmax=0.75, aspect="auto")
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list(
+        "nodis", ["#F2F2F2", "#4C72B0", "#4D9078", "#F2C14E", "#F78154", "#B4436C"], N=256)
+    im = ax.imshow(mat, cmap=cmap, vmin=0.0, vmax=0.75, aspect="auto", alpha=0.90)
     ax.set_xticks(np.arange(len(TOPOS)))
     ax.set_yticks(np.arange(len(methods)))
-    ax.set_xticklabels([t for t in TOPOS], size=8)
-    ax.set_yticklabels([LABELS[m] for m in methods], size=8)
+    ax.set_xticklabels([t for t in TOPOS])
+    ax.set_yticklabels([LABELS[m] for m in methods])
 
     # Annotate cells
     for mi in range(len(methods)):
@@ -98,27 +102,14 @@ def _heatmap(ax, diff):
             v = mat[mi, ti]
             if np.isnan(v):
                 continue
-            is_pig = methods[mi] in PIG_METHODS
-            # Bold + star for PIGLasso; mark best per column
-            best_in_col = max(mat[m_i, ti] for m_i in range(len(methods))
-                              if not np.isnan(mat[m_i, ti]))
             txt_color = "white" if (v < 0.15 or v > 0.55) else "black"
             ax.text(ti, mi, f"{v:.2f}", ha="center", va="center",
-                    fontsize=8, color=txt_color,
-                    fontweight="bold" if is_pig else "normal")
+                    fontsize=10, color=txt_color, fontweight="normal")
 
     cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("Normalised Spearman ρ", size=8)
-    cb.ax.tick_params(labelsize=7)
+    cb.set_label("Normalised diffusion recovery (Spearman ρ)", size=13)
+    cb.ax.tick_params(labelsize=12)
 
-    # Highlight PIGLasso rows
-    for pig_m, pig_color in [("piglasso", "#B4436C"), ("ssglasso", "#F78154")]:
-        if pig_m in methods:
-            pig_idx = methods.index(pig_m)
-            rect = plt.Rectangle((-0.5, pig_idx - 0.5), len(TOPOS), 1,
-                                  fill=False, edgecolor=pig_color,
-                                  linewidth=2.2, clip_on=False, zorder=5)
-            ax.add_patch(rect)
 
     ax.set_title("A   Diffusion recovery — normalised Spearman ρ\n"
                  "(mean across 3 configs × 3 δ-modes × 50 reps)",
@@ -150,32 +141,28 @@ def _delta_box(ax, diff):
                 continue
             xp    = di + offsets[mi]
             color = PALETTE[m]
-            lw    = 1.8 if m in PIG_METHODS else 0.7
             zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
 
             bp = ax.boxplot(vals, positions=[xp], widths=bw * 0.80,
                             patch_artist=True,
-                            medianprops=dict(color="white", linewidth=1.5),
-                            whiskerprops=dict(color=color, linewidth=lw),
-                            capprops=dict(color=color, linewidth=lw),
+                            medianprops=dict(color="white", linewidth=1.5, zorder=zo + 2),
+                            whiskerprops=dict(color=color, linewidth=0.7),
+                            capprops=dict(color=color, linewidth=0.7),
                             flierprops=dict(marker=".", color=color, ms=3, alpha=0.5))
             for patch in bp["boxes"]:
                 patch.set_facecolor(color)
-                patch.set_alpha(0.75 if m in PIG_METHODS else 0.45)
+                patch.set_alpha(1.0)
                 patch.set_edgecolor(color)
-                patch.set_linewidth(lw)
+                patch.set_linewidth(0.7)
                 patch.set_zorder(zo)
-            if m in PIG_METHODS:
-                for patch in bp["boxes"]:
-                    patch.set_alpha(0.85)
 
     ax.set_xticks(np.arange(n_delta))
     dm_labels = {"fiedler": "Fiedler", "hub": "Hub", "random": "Random"}
     ax.set_xticklabels([dm_labels.get(d, d.capitalize()) for d in delta_modes])
     ax.set_xlabel("Δ-signal mode")
-    ax.set_ylabel("Normalised Spearman ρ")
+    ax.set_ylabel("Normalised diffusion recovery (Spearman ρ)")
     ax.axhline(0, color="#999999", linewidth=0.8, linestyle="--", alpha=0.7)
-    ax.set_title("B   DiffSp_norm by δ-mode (n=513, p=164)",
+    ax.set_title("B   Diffusion recovery across δ-signal modes (n=513, p=164)",
                  pad=4, fontweight="bold")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
 
@@ -235,6 +222,8 @@ def _diffusion_vs_aupr(ax, df):
     """
     Each point = one (method, config, topology) cell mean.
     PIGLasso points plotted larger with crimson edge.
+    x-axis: MCC (uses full confusion matrix, more appropriate since
+    diffusion runs on the thresholded binary network).
     """
     diff = df[df["benchmark"] == "diffusion"]
     syn  = df[df["benchmark"] == "synthetic"]
@@ -252,7 +241,7 @@ def _diffusion_vs_aupr(ax, df):
                 a_val = syn.loc[
                     (syn["method"] == m) & (syn["config"] == cfg) &
                     (syn["topology"] == topo),
-                    "aupr"
+                    "mcc"
                 ].mean()
                 if np.isnan(d_val) or np.isnan(a_val):
                     continue
@@ -260,31 +249,26 @@ def _diffusion_vs_aupr(ax, df):
                 ys.append(d_val)
 
         color = PALETTE[m]
-        ms    = 60  if m in PIG_METHODS else 30
-        ec    = PALETTE[m] if m in PIG_METHODS else color
-        ew    = 1.5 if m in PIG_METHODS else 0.5
         zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
-        ax.scatter(xs, ys, color=color, s=ms, edgecolors=ec, linewidths=ew,
-                   zorder=zo, label=LABELS[m],
-                   alpha=0.85 if m in PIG_METHODS else 0.65)
+        ax.scatter(xs, ys, color=color, s=35, edgecolors=color, linewidths=0.5,
+                   zorder=zo, label=LABELS[m], alpha=0.75)
 
-    # Annotate PIGLasso advantage region
     ax.axhline(0, color="#999999", linewidth=0.7, linestyle="--", alpha=0.6)
-    ax.set_xlabel("AUPR (edge recovery)")
-    ax.set_ylabel("Normalised Spearman ρ\n(diffusion recovery)")
+    ax.set_xlabel("MCC (edge recovery)")
+    ax.set_ylabel("Normalised diffusion recovery\n(Spearman ρ)")
     ax.set_title("D   Edge recovery vs. diffusion recovery\n(per topology × config cell mean)",
                  pad=4, fontweight="bold")
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
-    ax.legend(loc="lower right", frameon=False, fontsize=7.5)
+    ax.legend(loc="lower right", frameon=False, fontsize=11)
 
     # Quadrant annotation
     ax.text(0.97, 0.97,
-            "High AUPR +\nhigh diffusion",
+            "High MCC +\nhigh diffusion",
             transform=ax.transAxes, ha="right", va="top",
             fontsize=6.5, color="grey", style="italic")
     ax.text(0.03, 0.97,
-            "Low AUPR +\nhigh diffusion",
+            "Low MCC +\nhigh diffusion",
             transform=ax.transAxes, ha="left", va="top",
             fontsize=6.5, color="grey", style="italic")
 
@@ -324,17 +308,94 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                                       linewidth=lw, label=label))
 
     fig.legend(handles=handles, loc="upper center", ncol=len(methods),
-               frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.00),
+               frameon=False, fontsize=13, bbox_to_anchor=(0.5, 1.00),
                handlelength=1.5, handleheight=0.95, columnspacing=2.0)
 
     fig.suptitle("NODIS — Diffusion & Knockout Analysis",
-                 y=1.04, fontsize=12, fontweight="bold")
+                 y=1.04, fontsize=17, fontweight="bold")
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Shared legend helper
+# ---------------------------------------------------------------------------
+
+def _add_method_legend(fig, methods):
+    import matplotlib.patches as mpatches
+    handles = [
+        mpatches.Patch(facecolor=PALETTE[m], edgecolor=PALETTE[m],
+                       linewidth=1.0, label=LABELS[m])
+        for m in methods
+    ]
+    fig.legend(handles=handles, loc="upper center", ncol=len(handles),
+               frameon=False, fontsize=13, bbox_to_anchor=(0.5, 1.00),
+               handlelength=1.5, handleheight=0.95, columnspacing=2.0)
+
+
+# ---------------------------------------------------------------------------
+# Individual panel figures
+# ---------------------------------------------------------------------------
+
+def build_panel_a(df: pd.DataFrame) -> plt.Figure:
+    diff = df[df["benchmark"] == "diffusion"]
+    fig, ax = plt.subplots(figsize=(7, 5))
+    fig.subplots_adjust(left=0.14, right=0.88, top=0.80, bottom=0.14)
+    _heatmap(ax, diff)
+    methods = [m for m in METHODS if m in diff["method"].unique()]
+    _add_method_legend(fig, methods)
+    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
+    return fig
+
+
+def build_panel_b(df: pd.DataFrame) -> plt.Figure:
+    diff = df[df["benchmark"] == "diffusion"]
+    fig, ax = plt.subplots(figsize=(7, 5))
+    fig.subplots_adjust(left=0.14, right=0.97, top=0.80, bottom=0.14)
+    _delta_box(ax, diff)
+    methods = [m for m in METHODS if m in diff["method"].unique()]
+    _add_method_legend(fig, methods)
+    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
+    return fig
+
+
+def build_panel_c(df: pd.DataFrame) -> plt.Figure:
+    diff = df[df["benchmark"] == "diffusion"]
+    fig, ax = plt.subplots(figsize=(7, 5))
+    fig.subplots_adjust(left=0.14, right=0.97, top=0.80, bottom=0.14)
+    _knockout_bar(ax, diff)
+    methods = [m for m in METHODS if m in diff["method"].unique()]
+    _add_method_legend(fig, methods)
+    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
+    return fig
+
+
+def build_panel_d(df: pd.DataFrame) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=(7, 5))
+    fig.subplots_adjust(left=0.14, right=0.97, top=0.80, bottom=0.14)
+    _diffusion_vs_aupr(ax, df)
+    # Panel D has its own legend inside; remove it and add shared one above
+    ax.get_legend().remove()
+    diff = df[df["benchmark"] == "diffusion"]
+    methods = [m for m in METHODS if m in diff["method"].unique()]
+    _add_method_legend(fig, methods)
+    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
     return fig
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
+def _save(fig, path, dpi):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    print(f"Saved → {path}")
+    if path.endswith(".pdf"):
+        png = path.replace(".pdf", ".png")
+        fig.savefig(png, dpi=150, bbox_inches="tight")
+        print(f"Saved → {png}")
+    plt.close(fig)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -343,9 +404,10 @@ def main():
     args = parser.parse_args()
 
     df = pd.read_csv(SUMMARY_CSV)
-    fig = build_figure(df)
-
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+
+    # Combined 4-panel figure
+    fig = build_figure(df)
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
     print(f"Saved → {args.out}")
     if args.out.endswith(".pdf"):
@@ -353,6 +415,12 @@ def main():
         fig.savefig(png, dpi=150, bbox_inches="tight")
         print(f"Saved → {png}")
     plt.close(fig)
+
+    # Individual panels
+    base = args.out.replace(".pdf", "")
+    for label, builder in [("_A", build_panel_a), ("_B", build_panel_b),
+                            ("_C", build_panel_c), ("_D", build_panel_d)]:
+        _save(builder(df), base + label + ".pdf", args.dpi)
 
 
 if __name__ == "__main__":
