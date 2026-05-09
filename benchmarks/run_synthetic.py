@@ -57,6 +57,8 @@ def main() -> None:
                                  "piglasso_oracle_n08", "piglasso_oracle_n09",
                                  "piglasso_oracle_n10"])
     parser.add_argument("--rep", type=int, required=True)
+    parser.add_argument("--seed-offset", type=int, default=0,
+                        help="Global seed offset for independent replications (0=original).")
     parser.add_argument("--out", default="results/raw/")
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--n-jobs", type=int, default=1,
@@ -70,13 +72,14 @@ def main() -> None:
     out_dir = pathlib.Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    seed_tag = f"_s{args.seed_offset:02d}" if args.seed_offset > 0 else ""
     result_file = out_dir / (
         f"results_{args.topology}_{args.config}"
-        f"_method_{args.method}_rep{args.rep:03d}.csv"
+        f"_method_{args.method}{seed_tag}_rep{args.rep:03d}.csv"
     )
     adj_file = out_dir / (
         f"adj_{args.topology}_{args.config}"
-        f"_method_{args.method}_rep{args.rep:03d}.pkl"
+        f"_method_{args.method}{seed_tag}_rep{args.rep:03d}.pkl"
     )
 
     # For piglasso, also require the adj pickle before skipping — it is needed
@@ -92,7 +95,7 @@ def main() -> None:
     from nodis.benchmark.evaluate import evaluate_predictions
 
     n, p = CONFIGS[args.config]
-    seed = args.rep * 1000 + hash(args.topology) % 1000
+    seed = args.seed_offset * 100_000 + args.rep * 1000 + hash(args.topology) % 1000
     data = generate(n=n, p=p, topology=args.topology, prob=0.05, seed=seed)
 
     # ----------------------------------------------------------------
@@ -184,6 +187,7 @@ def main() -> None:
         "config": args.config,
         "method": args.method,
         "rep": args.rep,
+        "seed_offset": args.seed_offset,
         "n": n,
         "p": p,
         "wall_seconds": wall,
