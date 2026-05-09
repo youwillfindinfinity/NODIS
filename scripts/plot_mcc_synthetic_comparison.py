@@ -96,32 +96,48 @@ FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fi
 # ---------------------------------------------------------------------------
 
 def _grand_means(df: pd.DataFrame) -> pd.DataFrame:
-    """Mean ± SD MCC across small3 configs, all topologies, per method."""
+    """Mean ± SD MCC across seed replications (grand mean per seed, then SD across seeds)."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
         (df["config"].isin(CONFIGS_SMALL3))
     ]
+    seed_col = "seed_offset" if "seed_offset" in small3.columns else None
     rows = []
     for m in METHODS_ORDER:
-        vals = small3.loc[small3["method"] == m, "mcc"].dropna()
-        if len(vals):
+        sub = small3.loc[small3["method"] == m, :]
+        if sub.empty:
+            continue
+        if seed_col and sub[seed_col].nunique() > 1:
+            # Mean per seed replication, then SD across seeds
+            per_seed = sub.groupby(seed_col)["mcc"].mean()
+            rows.append({"method": m, "MCC": per_seed.mean(), "SD": per_seed.std()})
+        else:
+            vals = sub["mcc"].dropna()
             rows.append({"method": m, "MCC": vals.mean(), "SD": vals.std()})
     return pd.DataFrame(rows)
 
 
 def _per_topology(df: pd.DataFrame) -> pd.DataFrame:
-    """Mean ± SD MCC per (method, topology) across small3 configs."""
+    """Mean ± SD MCC per (method, topology) across seed replications."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
         (df["config"].isin(CONFIGS_SMALL3))
     ]
+    seed_col = "seed_offset" if "seed_offset" in small3.columns else None
     rows = []
     for m in METHODS_ORDER:
         for topo in TOPOS:
-            vals = small3.loc[
-                (small3["method"] == m) & (small3["topology"] == topo), "mcc"
-            ].dropna()
-            if len(vals):
+            sub = small3.loc[
+                (small3["method"] == m) & (small3["topology"] == topo), :
+            ]
+            if sub.empty:
+                continue
+            if seed_col and sub[seed_col].nunique() > 1:
+                per_seed = sub.groupby(seed_col)["mcc"].mean()
+                rows.append({"method": m, "topology": topo,
+                             "MCC": per_seed.mean(), "SD": per_seed.std()})
+            else:
+                vals = sub["mcc"].dropna()
                 rows.append({"method": m, "topology": topo,
                              "MCC": vals.mean(), "SD": vals.std()})
     return pd.DataFrame(rows)

@@ -48,9 +48,10 @@ P        = 160
 CONFIGS  = [f"n{n}p{P}" for n in N_VALS]
 
 METHODS = {
-    "ssglasso":            ("SSGLasso", "#F2C14E", "o"),
-    "piglasso_oracle_n02": ("PIGLasso", "#B4436C", "o"),
+    "ssglasso":            ("SSGLasso", "#F2C14E", "o", "top",    -1),
+    "piglasso_oracle_n02": ("PIGLasso", "#B4436C", "o", "bottom", +1),
 }
+# label_va and label_side: "top"/−1 → label below point, "bottom"/+1 → label above cap
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
@@ -66,7 +67,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(8, 5))
     fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.13)
 
-    for method, (label, color, marker) in METHODS.items():
+    for method, (label, color, marker, lbl_va, lbl_sign) in METHODS.items():
         means, sds, ns = [], [], []
         for n in N_VALS:
             config = f"n{n}p{P}"
@@ -96,8 +97,10 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                     capsize=4, capthick=0.9, zorder=4)
 
         for n, m, s in zip(np.array(N_VALS)[mask], means[mask], sds[mask]):
-            ax.text(n, m + s + 0.012, f"{m:.2f}",
-                    ha="center", va="bottom", fontsize=8, color=color)
+            y_txt = (m + s + 0.018) if lbl_sign > 0 else (m - s - 0.018)
+            ax.text(n, y_txt, f"{m:.2f}",
+                    ha="center", va=lbl_va, fontsize=10,
+                    fontweight="bold", color=color)
 
     ax.axhline(0.5, color="#bbbbbb", linewidth=0.8, linestyle="--",
                label="Random baseline (0.5)", zorder=1)
@@ -105,7 +108,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     ax.set_xlabel("Sample size (n)")
     ax.set_ylabel("MCC")
     ax.set_xlim(0, N_VALS[-1] + 100)
-    ax.set_ylim(0.0, 1.05)
+    ax.set_ylim(0.15, 1.05)
     ax.set_xticks(N_VALS)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.1f}"))
     ax.legend(frameon=False, loc="lower right")

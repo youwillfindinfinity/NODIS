@@ -1,0 +1,67 @@
+#!/bin/bash
+#SBATCH --job-name=mcc_repl
+#SBATCH --output=logs/mcc_repl_%A_%a.out
+#SBATCH --error=logs/mcc_repl_%A_%a.err
+#SBATCH --time=02:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --array=0-599
+# Replication runs for MCC comparison: seed_offset=1 and seed_offset=2
+# Methods: glasso, desparsified, gglasso, ssglasso, piglasso_oracle_n02
+# Grid: 2 seeds × 5 methods × 3 configs × 4 topos × 50 reps = 6000 tasks
+# Each array job handles 10 tasks in parallel (600 array jobs total).
+#
+# Submit:
+#   sbatch --partition=rome jobs/mcc_replication.job
+
+NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+SEED_OFFSETS=(1 2)
+METHODS=("glasso" "desparsified" "gglasso" "ssglasso" "piglasso_oracle_n02")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+TOPOS=("hub" "scale-free" "cluster" "random")
+N_REPS=50
+N_SEEDS=2
+N_METHODS=5
+N_CONFIGS=3
+N_TOPOS=4
+TOTAL=$(( N_SEEDS * N_METHODS * N_CONFIGS * N_TOPOS * N_REPS ))   # 6000
+TASKS_PER_JOB=10
+
+mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    SEED_IDX=$(( FLAT / (N_METHODS * N_CONFIGS * N_TOPOS * N_REPS) ))
+    REM1=$(( FLAT % (N_METHODS * N_CONFIGS * N_TOPOS * N_REPS) ))
+    METH_IDX=$(( REM1 / (N_CONFIGS * N_TOPOS * N_REPS) ))
+    REM2=$(( REM1 % (N_CONFIGS * N_TOPOS * N_REPS) ))
+    CONFIG_IDX=$(( REM2 / (N_TOPOS * N_REPS) ))
+    REM3=$(( REM2 % (N_TOPOS * N_REPS) ))
+    TOPO_IDX=$(( REM3 / N_REPS ))
+    REP=$(( REM3 % N_REPS ))
+
+    SEED_OFFSET=${SEED_OFFSETS[$SEED_IDX]}
+    METHOD=${METHODS[$METH_IDX]}
+    CONFIG=${CONFIGS[$CONFIG_IDX]}
+    TOPO=${TOPOS[$TOPO_IDX]}
+
+    echo "[$FLAT] seed=${SEED_OFFSET} method=${METHOD} config=${CONFIG} topology=${TOPO} rep=${REP}"
+
+    python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+        --topology     "$TOPO"         \
+        --config       "$CONFIG"       \
+        --method       "$METHOD"       \
+        --rep          "$REP"          \
+        --seed-offset  "$SEED_OFFSET"  \
+        --prior-weight 0.5             \
+        --out          "$NODIS_DIR/results/raw/" &
+done
+
+wait
