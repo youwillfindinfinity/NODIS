@@ -1,0 +1,61 @@
+#!/bin/bash
+#SBATCH --job-name=mcc_vs_n
+#SBATCH --output=logs/mcc_vs_n_%A_%a.out
+#SBATCH --error=logs/mcc_vs_n_%A_%a.err
+#SBATCH --time=02:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --array=0-159
+# MCC vs sample size sweep: fixed p=160, varying n, methods ssglasso + piglasso_oracle_n02
+# Grid: 8 n-values × 4 topologies × 2 methods × 20 reps = 1280 tasks
+# Each array job handles 8 tasks in parallel (160 array jobs total).
+#
+# Submit:
+#   sbatch --partition=rome jobs/mcc_vs_n.job
+
+NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+CONFIGS=("n100p160" "n300p160" "n500p160" "n700p160"
+         "n900p160" "n1100p160" "n1300p160" "n1500p160")
+TOPOS=("hub" "scale-free" "cluster" "random")
+METHODS=("ssglasso" "piglasso_oracle_n02")
+N_REPS=20
+N_CONFIGS=8
+N_TOPOS=4
+N_METHODS=2
+TOTAL=$(( N_CONFIGS * N_TOPOS * N_METHODS * N_REPS ))   # 1280
+TASKS_PER_JOB=8
+
+mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    CONFIG_IDX=$(( FLAT / (N_TOPOS * N_METHODS * N_REPS) ))
+    REM1=$(( FLAT % (N_TOPOS * N_METHODS * N_REPS) ))
+    TOPO_IDX=$(( REM1 / (N_METHODS * N_REPS) ))
+    REM2=$(( REM1 % (N_METHODS * N_REPS) ))
+    METH_IDX=$(( REM2 / N_REPS ))
+    REP=$(( REM2 % N_REPS ))
+
+    CONFIG=${CONFIGS[$CONFIG_IDX]}
+    TOPO=${TOPOS[$TOPO_IDX]}
+    METHOD=${METHODS[$METH_IDX]}
+
+    echo "[$FLAT] config=${CONFIG} topology=${TOPO} method=${METHOD} rep=${REP}"
+
+    python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+        --topology     "$TOPO"   \
+        --config       "$CONFIG" \
+        --method       "$METHOD" \
+        --rep          "$REP"    \
+        --prior-weight 0.5       \
+        --out          "$NODIS_DIR/results/raw/" &
+done
+
+wait

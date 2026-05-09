@@ -1,28 +1,14 @@
-#!/bin/bash
-#SBATCH --job-name=nodis_aggregate
-#SBATCH --output=logs/aggregate_%j.out
-#SBATCH --time=00:30:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
-#SBATCH --partition=thin
+"""
+Rebuild results/metrics_summary.csv from all per-method result directories.
 
-# Resolve NODIS repo root from this job file's location
-export NODIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+Usage (from NODIS/ root):
+    python scripts/rebuild_metrics_summary.py
+"""
+import pathlib
+import pandas as pd
 
-[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
-source "$NODIS_DIR/.venv/bin/activate"
-
-mkdir -p "$NODIS_DIR/logs"
-echo "NODIS_DIR=${NODIS_DIR}"
-
-python - <<'EOF'
-import pathlib, pandas as pd
-
-# Always resolve relative to the NODIS repo root, not the calling CWD
-import os
-NODIS_DIR = pathlib.Path(os.environ["NODIS_DIR"])
-results    = NODIS_DIR / "results"
+NODIS_DIR = pathlib.Path(__file__).resolve().parents[1]
+results = NODIS_DIR / "results"
 summary_path = results / "metrics_summary.csv"
 
 sections = {
@@ -36,7 +22,6 @@ sections = {
     "sergio":    list(results.glob("sergio/sergio_*.csv")),
 }
 
-# Load new rows only for benchmarks that have files
 new_dfs = []
 found_benchmarks = set()
 for source, files in sections.items():
@@ -54,7 +39,6 @@ if not new_dfs:
 else:
     new_data = pd.concat(new_dfs, ignore_index=True)
 
-    # Preserve existing rows for benchmarks not touched in this run
     if summary_path.exists():
         existing = pd.read_csv(summary_path)
         keep = existing[~existing["benchmark"].isin(found_benchmarks)]
@@ -65,4 +49,3 @@ else:
 
     summary.to_csv(summary_path, index=False)
     print(f"Saved {len(summary)} total rows → {summary_path}")
-EOF

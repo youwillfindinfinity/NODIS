@@ -28,6 +28,15 @@ CONFIGS = {
     "n237p78":   (237, 78),
     "n513p164":  (513, 164),
     "n1026p328": (1026, 328),
+    # n-sweep configs: fixed p=160, varying n
+    "n100p160":  (100,  160),
+    "n300p160":  (300,  160),
+    "n500p160":  (500,  160),
+    "n700p160":  (700,  160),
+    "n900p160":  (900,  160),
+    "n1100p160": (1100, 160),
+    "n1300p160": (1300, 160),
+    "n1500p160": (1500, 160),
 }
 
 
@@ -38,6 +47,7 @@ def main() -> None:
     parser.add_argument("--config", required=True, choices=list(CONFIGS))
     parser.add_argument("--method", required=True,
                         choices=["desparsified", "glasso", "gglasso", "silggm_r",
+                                 "ssglasso",
                                  "piglasso", "piglasso_adaptive", "piglasso_corr",
                                  "piglasso_oracle",
                                  "piglasso_oracle_n00", "piglasso_oracle_n01",
@@ -116,6 +126,13 @@ def main() -> None:
         r_res = run_silggm_r(data.X, method="B_NW_SL", alpha=args.alpha)
         adj = r_res["adj"]
         scores = np.abs(r_res["z_score"])
+
+    elif args.method == "ssglasso":
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        est = PIGLassoEstimator(n_jobs=args.n_jobs)
+        est.fit(data.X)
+        adj = est.get_adjacency()
+        scores = est.precision_
 
     elif args.method == "piglasso":
         from nodis.estimators.piglasso import PIGLassoEstimator
