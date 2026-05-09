@@ -96,7 +96,7 @@ FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fi
 # ---------------------------------------------------------------------------
 
 def _grand_means(df: pd.DataFrame) -> pd.DataFrame:
-    """Mean MCC across small3 configs, all topologies, per method."""
+    """Mean ± SD MCC across small3 configs, all topologies, per method."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
         (df["config"].isin(CONFIGS_SMALL3))
@@ -105,12 +105,12 @@ def _grand_means(df: pd.DataFrame) -> pd.DataFrame:
     for m in METHODS_ORDER:
         vals = small3.loc[small3["method"] == m, "mcc"].dropna()
         if len(vals):
-            rows.append({"method": m, "MCC": vals.mean()})
+            rows.append({"method": m, "MCC": vals.mean(), "SD": vals.std()})
     return pd.DataFrame(rows)
 
 
 def _per_topology(df: pd.DataFrame) -> pd.DataFrame:
-    """Mean MCC per (method, topology) across small3 configs."""
+    """Mean ± SD MCC per (method, topology) across small3 configs."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
         (df["config"].isin(CONFIGS_SMALL3))
@@ -122,7 +122,8 @@ def _per_topology(df: pd.DataFrame) -> pd.DataFrame:
                 (small3["method"] == m) & (small3["topology"] == topo), "mcc"
             ].dropna()
             if len(vals):
-                rows.append({"method": m, "topology": topo, "MCC": vals.mean()})
+                rows.append({"method": m, "topology": topo,
+                             "MCC": vals.mean(), "SD": vals.std()})
     return pd.DataFrame(rows)
 
 
@@ -134,15 +135,18 @@ def _grand_mean_bars(ax, grand: pd.DataFrame, title: str):
     grand = grand.sort_values("MCC", ascending=True).reset_index(drop=True)
     methods = grand["method"].tolist()
     values  = grand["MCC"].tolist()
+    sds     = grand["SD"].tolist()
     n = len(methods)
 
-    for i, (m, v) in enumerate(zip(methods, values)):
+    for i, (m, v, sd) in enumerate(zip(methods, values, sds)):
         color = PALETTE[m]
         lw    = 0.8
         ec    = "#444444"
         zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
         ax.barh(i, v, color=color, edgecolor=ec, linewidth=lw,
                 zorder=zo, height=0.6)
+        ax.errorbar(v, i, xerr=sd, fmt="none", ecolor="#333333",
+                    elinewidth=0.9, capsize=3, capthick=0.9, zorder=zo + 1)
 
         ax.text(v - 0.005, i, f"{v:.3f}", va="center", ha="right",
                 fontsize=7.5,
@@ -177,6 +181,7 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
             if row.empty:
                 continue
             v     = float(row["MCC"].iloc[0])
+            sd    = float(row["SD"].iloc[0])
             xp    = ti + offsets[mi]
             color = PALETTE[m]
             lw    = 0.7
@@ -184,8 +189,10 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
             zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
             ax.bar(xp, v, bw * 0.90, color=color, edgecolor=ec,
                    linewidth=lw, zorder=zo)
+            ax.errorbar(xp, v, yerr=sd, fmt="none", ecolor="#333333",
+                        elinewidth=0.8, capsize=2, capthick=0.8, zorder=zo + 1)
 
-            ax.text(xp, v + 0.008, f"{v:.2f}", ha="center", va="bottom",
+            ax.text(xp, v + sd + 0.015, f"{v:.2f}", ha="center", va="bottom",
                     fontsize=5.5,
                     color="#444444",
                     fontweight="bold" if m in PIG_METHODS else "normal")
@@ -193,7 +200,7 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
     ax.set_xticks(np.arange(n_topo))
     ax.set_xticklabels([t for t in TOPOS])
     ax.set_ylabel("MCC")
-    ax.set_ylim(0, 1.00)
+    ax.set_ylim(0, 1.10)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.set_title(title, pad=6, fontweight="bold")
     ax.axhline(0, color="#bbbbbb", linewidth=0.6)
