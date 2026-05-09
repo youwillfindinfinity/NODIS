@@ -60,25 +60,25 @@ matplotlib.rcParams.update({
 # Colour + method metadata
 # ---------------------------------------------------------------------------
 METHODS_ORDER = ["glasso", "desparsified", "gglasso",
-                 "ssglasso", "piglasso"]
+                 "ssglasso", "piglasso_oracle_n02"]
 
 PALETTE = {
-    "glasso":     "#4C72B0",
-    "desparsified":"#F78154",
-    "gglasso":    "#5CAD6E",
-    "ssglasso":   "#F2C14E",   # SSGLasso (no prior)
-    "piglasso":   "#B4436C",   # PIGLasso (with prior)
+    "glasso":              "#4C72B0",
+    "desparsified":        "#F78154",
+    "gglasso":             "#5CAD6E",
+    "ssglasso":            "#F2C14E",   # SSGLasso (no prior)
+    "piglasso_oracle_n02": "#B4436C",   # PIGLasso (with prior)
 }
 LABELS = {
-    "glasso":     "GLasso",
-    "desparsified":"Desparsified",
-    "gglasso":    "GGLasso",
-    "ssglasso":   "SSGLasso",
-    "piglasso":   "PIGLasso",
+    "glasso":              "GLasso",
+    "desparsified":        "Desparsified",
+    "gglasso":             "GGLasso",
+    "ssglasso":            "SSGLasso",
+    "piglasso_oracle_n02": "PIGLasso",
 }
 # Methods drawn with highlighted style
-PIG_METHODS   = {"ssglasso", "piglasso"}
-ORACLE_METHOD = "piglasso"
+PIG_METHODS   = {"ssglasso", "piglasso_oracle_n02"}
+ORACLE_METHOD = "piglasso_oracle_n02"
 
 ZO_PIG  = 5
 ZO_BASE = 2

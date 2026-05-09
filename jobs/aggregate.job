@@ -1,17 +1,19 @@
 #!/bin/bash
 #SBATCH --job-name=nodis_aggregate
-#SBATCH --output=/home/zblei/NODIS/logs/aggregate_%j.out
+#SBATCH --output=logs/aggregate_%j.out
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --partition=thin
 
-[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
-source "$HOME/NODIS/.venv/bin/activate"
-
 # Resolve NODIS repo root from this job file's location
 export NODIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+mkdir -p "$NODIS_DIR/logs"
 echo "NODIS_DIR=${NODIS_DIR}"
 
 python - <<'EOF'
@@ -24,7 +26,8 @@ results    = NODIS_DIR / "results"
 summary_path = results / "metrics_summary.csv"
 
 sections = {
-    "synthetic": list(results.glob("raw/results_*.csv")),
+    "synthetic": (list(results.glob("raw/results_*.csv")) +
+                  list(results.glob("piglasso/synthetic/results_*.csv"))),
     "dream5":    list(results.glob("dream5/dream5_*.csv")),
     "diffusion": list(results.glob("diffusion/diffusion_*.csv")),
     "sergio":    list(results.glob("sergio/sergio_*.csv")),
