@@ -112,8 +112,6 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     ax.set_xticks(N_VALS)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.1f}"))
     ax.legend(frameon=False, loc="lower right")
-    ax.set_title(f"MCC vs sample size  (p = {P}, all topologies)",
-                 fontweight="bold", pad=8)
 
     return fig
 

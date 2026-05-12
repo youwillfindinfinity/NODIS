@@ -57,8 +57,23 @@ else:
         existing = pd.read_csv(summary_path, low_memory=False)
         if "seed_offset" not in existing.columns:
             existing["seed_offset"] = 0
-        keep = existing[~existing["benchmark"].isin(found_benchmarks)]
-        print(f"  preserving {len(keep)} existing rows from untouched benchmarks")
+
+        # Only drop existing rows for (benchmark, method, config, seed_offset)
+        # combinations present in new data — preserves rows for methods/configs
+        # whose CSV files don't exist locally (e.g. ssglasso small3 on Snellius).
+        if "method" in new_data.columns and "seed_offset" in new_data.columns:
+            new_keys = set(zip(new_data["benchmark"], new_data["method"],
+                               new_data["config"], new_data["seed_offset"]))
+            mask_drop = existing.apply(
+                lambda r: (r.get("benchmark"), r.get("method"),
+                           r.get("config"), r.get("seed_offset", 0)) in new_keys,
+                axis=1
+            )
+            keep = existing[~mask_drop]
+        else:
+            keep = existing[~existing["benchmark"].isin(found_benchmarks)]
+
+        print(f"  preserving {len(keep)} existing rows not covered by new files")
         summary = pd.concat([keep, new_data], ignore_index=True)
     else:
         summary = new_data
