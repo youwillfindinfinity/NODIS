@@ -97,13 +97,15 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                     capsize=4, capthick=0.9, zorder=4)
 
         for n, m, s in zip(np.array(N_VALS)[mask], means[mask], sds[mask]):
-            y_txt = (m + s + 0.018) if lbl_sign > 0 else (m - s - 0.018)
+            y_txt = (m + s + 0.055) if lbl_sign > 0 else (m - s - 0.018)
             ax.text(n, y_txt, f"{m:.2f}",
                     ha="center", va=lbl_va, fontsize=10,
                     fontweight="bold", color=color)
 
-    ax.axhline(0.5, color="#bbbbbb", linewidth=0.8, linestyle="--",
+    ax.axhline(0.5, color="#4D9078", linewidth=1.6, linestyle="--",
                label="Random baseline (0.5)", zorder=1)
+    ax.axvline(513, color="#4C72B0", linewidth=1.6, linestyle=":",
+               label="GSE182616 dataset (n=513)", zorder=1)
 
     ax.set_xlabel("Sample size (n)")
     ax.set_ylabel("MCC")
