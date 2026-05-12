@@ -84,7 +84,7 @@ ZO_PIG  = 5
 ZO_BASE = 2
 
 TOPOS = ["cluster", "hub", "random", "scale-free"]
-CONFIGS_SMALL3 = ["n100p50", "n237p78", "n513p164"]
+CONFIGS_SMALL3 = ["n513p164"]
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
@@ -164,8 +164,8 @@ def _grand_mean_bars(ax, grand: pd.DataFrame, title: str):
         ax.errorbar(v, i, xerr=sd, fmt="none", ecolor="#333333",
                     elinewidth=0.9, capsize=3, capthick=0.9, zorder=zo + 1)
 
-        ax.text(v - 0.005, i, f"{v:.3f}", va="center", ha="right",
-                fontsize=7.5,
+        ax.text(v + 0.012, i, f"{v:.3f}", va="center", ha="left",
+                fontsize=11,
                 color="#333333",
                 fontweight="bold" if m in PIG_METHODS else "normal",
                 zorder=zo + 2)
@@ -173,9 +173,9 @@ def _grand_mean_bars(ax, grand: pd.DataFrame, title: str):
     ax.set_yticks(np.arange(n))
     ax.set_yticklabels([LABELS[m] for m in methods])
     ax.set_xlabel("MCC")
-    ax.set_xlim(0, 0.95)
+    ax.set_ylabel("Inference method")
+    ax.set_xlim(0, 1.02)
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
-    ax.set_title(title, pad=6, fontweight="bold")
     ax.axvline(0, color="#bbbbbb", linewidth=0.6)
 
 
@@ -187,7 +187,7 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
     methods = [m for m in METHODS_ORDER if m in per_topo["method"].unique()]
     n_topo  = len(TOPOS)
     n_meth  = len(methods)
-    gw      = 0.82
+    gw      = 0.90
     bw      = gw / n_meth
     offsets = np.linspace(-gw / 2 + bw / 2, gw / 2 - bw / 2, n_meth)
 
@@ -209,16 +209,16 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
                         elinewidth=0.8, capsize=2, capthick=0.8, zorder=zo + 1)
 
             ax.text(xp, v + sd + 0.015, f"{v:.2f}", ha="center", va="bottom",
-                    fontsize=5.5,
+                    fontsize=9,
                     color="#444444",
                     fontweight="bold" if m in PIG_METHODS else "normal")
 
     ax.set_xticks(np.arange(n_topo))
     ax.set_xticklabels([t for t in TOPOS])
+    ax.set_xlabel("Network topology")
     ax.set_ylabel("MCC")
     ax.set_ylim(0, 1.10)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
-    ax.set_title(title, pad=6, fontweight="bold")
     ax.axhline(0, color="#bbbbbb", linewidth=0.6)
 
 
@@ -230,10 +230,11 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     grand    = _grand_means(df)
     per_topo = _per_topology(df)
 
-    fig = plt.figure(figsize=(13, 5))
+    fig = plt.figure(figsize=(16, 5))
     gs  = GridSpec(1, 2, figure=fig,
-                   wspace=0.40,
-                   left=0.10, right=0.97,
+                   width_ratios=[1, 1.8],
+                   wspace=0.35,
+                   left=0.08, right=0.97,
                    top=0.85, bottom=0.12)
 
     ax_A = fig.add_subplot(gs[0, 0])
@@ -259,8 +260,6 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                bbox_to_anchor=(0.5, 1.00),
                handlelength=1.5, handleheight=0.95, columnspacing=1.8)
 
-    fig.suptitle("Synthetic benchmark \u2014 MCC comparison",
-                 y=1.05, fontsize=17, fontweight="bold")
 
     return fig
 

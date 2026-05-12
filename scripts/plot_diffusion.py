@@ -110,10 +110,8 @@ def _heatmap(ax, diff):
     cb.set_label("Normalised diffusion recovery (Spearman ρ)", size=13)
     cb.ax.tick_params(labelsize=12)
 
-
-    ax.set_title("A   Diffusion recovery — normalised Spearman ρ\n"
-                 "(mean across 3 configs × 3 δ-modes × 50 reps)",
-                 pad=6, fontweight="bold")
+    ax.set_xlabel("Network topology", fontsize=13)
+    ax.set_ylabel("Inference method", fontsize=13)
     ax.spines[:].set_visible(False)
 
 
@@ -162,8 +160,6 @@ def _delta_box(ax, diff):
     ax.set_xlabel("Δ-signal mode")
     ax.set_ylabel("Normalised diffusion recovery (Spearman ρ)")
     ax.axhline(0, color="#999999", linewidth=0.8, linestyle="--", alpha=0.7)
-    ax.set_title("B   Diffusion recovery across δ-signal modes (n=513, p=164)",
-                 pad=4, fontweight="bold")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
 
 
@@ -192,26 +188,20 @@ def _knockout_bar(ax, diff):
             sem = vals.sem()
             xp    = ti + offsets[mi]
             color = PALETTE[m]
-            lw    = 1.8 if m in PIG_METHODS else 0.7
-            ec    = PALETTE[m] if m in PIG_METHODS else "#444444"
+            lw    = 0.7
+            ec    = "#444444"
             zo    = ZO_PIG if m in PIG_METHODS else ZO_BASE
             ax.bar(xp, mu, bw * 0.86, color=color, edgecolor=ec,
                    linewidth=lw, zorder=zo)
             ax.errorbar(xp, mu, yerr=sem, fmt="none", color="black",
                         capsize=2, capthick=0.7, linewidth=0.7, zorder=zo + 1)
-            if m in PIG_METHODS:
-                ax.bar(xp, mu, bw * 0.86, color="none", edgecolor=ec,
-                       linewidth=2.0, zorder=zo + 1)
 
     ax.set_xticks(np.arange(n_topo))
     ax.set_xticklabels([t for t in TOPOS])
+    ax.set_xlabel("Network topology")
     ax.set_ylabel("Knockout top-10 recall")
-    ax.axhline(10 / 50, color="#aaaaaa", linewidth=0.7, linestyle=":",
-               label=f"Random ({10/50:.2f})")
     ax.set_ylim(0, 1.05)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
-    ax.set_title("C   Knockout top-10 recall by topology",
-                 pad=4, fontweight="bold")
 
 
 # ---------------------------------------------------------------------------
@@ -256,21 +246,10 @@ def _diffusion_vs_aupr(ax, df):
     ax.axhline(0, color="#999999", linewidth=0.7, linestyle="--", alpha=0.6)
     ax.set_xlabel("MCC (edge recovery)")
     ax.set_ylabel("Normalised diffusion recovery\n(Spearman ρ)")
-    ax.set_title("D   Edge recovery vs. diffusion recovery\n(per topology × config cell mean)",
-                 pad=4, fontweight="bold")
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.legend(loc="lower right", frameon=False, fontsize=11)
 
-    # Quadrant annotation
-    ax.text(0.97, 0.97,
-            "High MCC +\nhigh diffusion",
-            transform=ax.transAxes, ha="right", va="top",
-            fontsize=6.5, color="grey", style="italic")
-    ax.text(0.03, 0.97,
-            "Low MCC +\nhigh diffusion",
-            transform=ax.transAxes, ha="left", va="top",
-            fontsize=6.5, color="grey", style="italic")
 
 
 # ---------------------------------------------------------------------------
@@ -311,8 +290,6 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                frameon=False, fontsize=13, bbox_to_anchor=(0.5, 1.00),
                handlelength=1.5, handleheight=0.95, columnspacing=2.0)
 
-    fig.suptitle("NODIS — Diffusion & Knockout Analysis",
-                 y=1.04, fontsize=17, fontweight="bold")
     return fig
 
 
@@ -343,7 +320,6 @@ def build_panel_a(df: pd.DataFrame) -> plt.Figure:
     _heatmap(ax, diff)
     methods = [m for m in METHODS if m in diff["method"].unique()]
     _add_method_legend(fig, methods)
-    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
     return fig
 
 
@@ -354,7 +330,6 @@ def build_panel_b(df: pd.DataFrame) -> plt.Figure:
     _delta_box(ax, diff)
     methods = [m for m in METHODS if m in diff["method"].unique()]
     _add_method_legend(fig, methods)
-    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
     return fig
 
 
@@ -365,7 +340,6 @@ def build_panel_c(df: pd.DataFrame) -> plt.Figure:
     _knockout_bar(ax, diff)
     methods = [m for m in METHODS if m in diff["method"].unique()]
     _add_method_legend(fig, methods)
-    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
     return fig
 
 
@@ -378,7 +352,6 @@ def build_panel_d(df: pd.DataFrame) -> plt.Figure:
     diff = df[df["benchmark"] == "diffusion"]
     methods = [m for m in METHODS if m in diff["method"].unique()]
     _add_method_legend(fig, methods)
-    fig.suptitle("NODIS — Diffusion & Knockout Analysis", y=1.10, fontsize=17, fontweight="bold")
     return fig
 
 

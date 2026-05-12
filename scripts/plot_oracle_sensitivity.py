@@ -131,8 +131,6 @@ def _oracle_panel(ax, data, metric, ylabel, title):
     ax.set_xticklabels(NOISE_LABELS)
     ax.set_xlabel("Prior noise level (fraction of edges flipped)")
     ax.set_ylabel(ylabel)
-    if title:
-        ax.set_title(title, pad=6, fontsize=13, fontweight="normal", color="black")
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda v, _: f"{v:.2f}")
     )
@@ -164,8 +162,6 @@ def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
                bbox_to_anchor=(0.5, 1.00),
                handlelength=1.8, columnspacing=2.0)
 
-    fig.suptitle("PIGLasso prior noise sensitivity sweep",
-                 y=1.12, fontsize=17, fontweight="bold")
 
     return fig
 
