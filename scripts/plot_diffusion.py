@@ -77,7 +77,7 @@ TOPOS  = ["cluster", "hub", "random", "scale-free"]
 
 def _heatmap(ax, diff):
     methods  = [m for m in METHODS if m in diff["method"].unique()]
-    small3   = diff[diff["config"].isin(SMALL3)]
+    small3   = diff[diff["config"] == "n513p164"]
     mat      = np.full((len(methods), len(TOPOS)), np.nan)
     for mi, m in enumerate(methods):
         for ti, t in enumerate(TOPOS):
@@ -168,7 +168,7 @@ def _delta_box(ax, diff):
 # ---------------------------------------------------------------------------
 
 def _knockout_bar(ax, diff):
-    small3   = diff[diff["config"].isin(SMALL3)]
+    small3   = diff[diff["config"] == "n513p164"]
     methods  = [m for m in METHODS if m in small3["method"].unique()]
     n_topo   = len(TOPOS)
     n_meth   = len(methods)
@@ -316,10 +316,8 @@ def _add_method_legend(fig, methods):
 def build_panel_a(df: pd.DataFrame) -> plt.Figure:
     diff = df[df["benchmark"] == "diffusion"]
     fig, ax = plt.subplots(figsize=(7, 5))
-    fig.subplots_adjust(left=0.14, right=0.88, top=0.80, bottom=0.14)
+    fig.subplots_adjust(left=0.14, right=0.88, top=0.95, bottom=0.14)
     _heatmap(ax, diff)
-    methods = [m for m in METHODS if m in diff["method"].unique()]
-    _add_method_legend(fig, methods)
     return fig
 
 
