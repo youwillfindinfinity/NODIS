@@ -148,3 +148,12 @@ def test_nodis_enrich_importable():
     assert hasattr(nodis.enrich, "from_result")
     assert hasattr(nodis.enrich, "from_adjacency")
     assert hasattr(nodis.enrich, "EnrichmentResult")
+
+
+def test_cli_enrich_help():
+    from click.testing import CliRunner
+    from nodis.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["enrich", "--help"])
+    assert result.exit_code == 0
+    assert "adjacency" in result.output.lower() or "enrich" in result.output.lower()
