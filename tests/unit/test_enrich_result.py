@@ -97,3 +97,48 @@ def test_significant_missing_column_warns():
     with pytest.warns(UserWarning, match="adjusted_p_value"):
         result = er.significant(alpha=0.05)
     assert len(result) == 1  # full df returned
+
+
+from nodis.enrich.databases import get_databases, VALID_LEVELS
+
+
+def test_valid_levels():
+    assert set(VALID_LEVELS) == {"rna", "post_transcriptional", "protein", "all"}
+
+
+def test_get_databases_rna_gprofiler():
+    dbs = get_databases(level="rna", backend="gprofiler")
+    assert "GO:BP" in dbs
+    assert "KEGG" in dbs
+    assert "REAC" in dbs
+
+
+def test_get_databases_protein_gprofiler():
+    dbs = get_databases(level="protein", backend="gprofiler")
+    assert "CORUM" in dbs
+    assert "HPA" in dbs
+
+
+def test_get_databases_post_transcriptional_gprofiler():
+    dbs = get_databases(level="post_transcriptional", backend="gprofiler")
+    assert "MIRNA" in dbs
+    assert "TF" in dbs
+
+
+def test_get_databases_all_gprofiler():
+    dbs = get_databases(level="all", backend="gprofiler")
+    assert "GO:BP" in dbs
+    assert "CORUM" in dbs
+    assert "MIRNA" in dbs
+
+
+def test_get_databases_rna_gseapy():
+    dbs = get_databases(level="rna", backend="gseapy")
+    assert "GO_Biological_Process_2023" in dbs
+    assert "KEGG_2021_Human" in dbs
+    assert "Reactome_2022" in dbs
+
+
+def test_get_databases_invalid_level():
+    with pytest.raises(ValueError, match="level must be one of"):
+        get_databases(level="lipids", backend="gprofiler")
