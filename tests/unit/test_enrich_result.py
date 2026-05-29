@@ -140,3 +140,11 @@ def test_get_databases_rna_gseapy():
 def test_get_databases_invalid_level():
     with pytest.raises(ValueError, match="level must be one of"):
         get_databases(level="lipids", backend="gprofiler")
+
+
+def test_nodis_enrich_importable():
+    """nodis.enrich must be importable from the top-level package."""
+    import nodis.enrich
+    assert hasattr(nodis.enrich, "from_result")
+    assert hasattr(nodis.enrich, "from_adjacency")
+    assert hasattr(nodis.enrich, "EnrichmentResult")
