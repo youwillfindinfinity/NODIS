@@ -170,6 +170,7 @@ def community_gene_sets(
     gene_names: list[str],
     algorithm: str = "greedy_modularity",
     min_size: int = 2,
+    seed: int | None = None,
 ) -> dict[str, list[str]]:
     """Partition genes into network communities using the inferred adjacency.
 
@@ -188,13 +189,17 @@ def community_gene_sets(
         ``"label_propagation"``
             Label propagation (Raghavan et al., 2007). Faster on large graphs.
     min_size : int, default 2
-        Communities smaller than this are merged into a ``"community_other"``
-        bucket.
+        Communities smaller than ``min_size`` are merged into a
+        ``"community_other"`` bucket.
+    seed : int or None, default None
+        Random seed for reproducible results with ``"label_propagation"``.
+        ``"greedy_modularity"`` is deterministic and ignores this parameter.
+        ``"label_propagation"`` is non-deterministic unless ``seed`` is provided.
 
     Returns
     -------
     dict mapping ``"community_0"``, ``"community_1"``, … → list of gene names.
-    Singletons (size < min_size) go into ``"community_other"``.
+    Communities smaller than ``min_size`` go into ``"community_other"``.
 
     Raises
     ------
@@ -214,6 +219,8 @@ def community_gene_sets(
         # Works on disconnected graphs
         partition = nx.community.greedy_modularity_communities(G)
     else:  # label_propagation
+        if seed is not None:
+            np.random.seed(seed)
         partition = nx.community.label_propagation_communities(G)
 
     # Sort by size descending for stable labelling

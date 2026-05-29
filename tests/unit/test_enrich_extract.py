@@ -122,12 +122,12 @@ def test_community_gene_sets_invalid_algorithm():
 
 
 def test_community_gene_sets_disconnected():
-    # Fully disconnected graph — each gene is its own community
     adj = np.zeros((4, 4), dtype=int)
     names = ["A", "B", "C", "D"]
     comms = community_gene_sets(adj, names)
     all_genes = [g for genes in comms.values() for g in genes]
     assert sorted(all_genes) == sorted(names)
+    assert len(all_genes) == len(names)  # no duplicates
 
 
 def test_hub_genes_empty_graph_returns_empty():
@@ -147,3 +147,12 @@ def test_ranked_genes_shape_mismatch_raises():
     pvals = _make_pval(p=8)
     with pytest.raises(ValueError, match="gene_names length"):
         ranked_genes(adj, ["A", "B"], pvals, method="degree")
+
+
+def test_community_gene_sets_label_propagation_coverage():
+    adj = _make_adj(p=10, seed=2)
+    names = [f"G{i}" for i in range(10)]
+    comms = community_gene_sets(adj, names, algorithm="label_propagation", seed=42)
+    all_genes = [g for genes in comms.values() for g in genes]
+    assert sorted(all_genes) == sorted(names)
+    assert len(all_genes) == len(names)
