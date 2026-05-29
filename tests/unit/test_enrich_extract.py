@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from nodis.enrich.extract import hub_genes, ranked_genes
+from nodis.enrich.extract import hub_genes, ranked_genes, community_gene_sets
 
 
 def _make_adj(p: int = 8, seed: int = 0) -> np.ndarray:
@@ -93,3 +93,38 @@ def test_ranked_genes_invalid_method():
     names = [f"G{i}" for i in range(8)]
     with pytest.raises(ValueError, match="method must be one of"):
         ranked_genes(adj, names, pvals, method="bogus")
+
+
+def test_community_gene_sets_returns_dict():
+    adj = _make_adj(p=10, seed=1)
+    names = [f"G{i}" for i in range(10)]
+    comms = community_gene_sets(adj, names, algorithm="greedy_modularity")
+    assert isinstance(comms, dict)
+    assert len(comms) >= 1
+    # All genes must appear in exactly one community
+    all_genes = [g for genes in comms.values() for g in genes]
+    assert sorted(all_genes) == sorted(names)
+
+
+def test_community_gene_sets_label_format():
+    adj = _make_adj(p=10, seed=1)
+    names = [f"G{i}" for i in range(10)]
+    comms = community_gene_sets(adj, names)
+    for key in comms.keys():
+        assert key.startswith("community_"), f"unexpected key: {key}"
+
+
+def test_community_gene_sets_invalid_algorithm():
+    adj = _make_adj()
+    names = [f"G{i}" for i in range(8)]
+    with pytest.raises(ValueError, match="algorithm must be one of"):
+        community_gene_sets(adj, names, algorithm="kmeans")
+
+
+def test_community_gene_sets_disconnected():
+    # Fully disconnected graph — each gene is its own community
+    adj = np.zeros((4, 4), dtype=int)
+    names = ["A", "B", "C", "D"]
+    comms = community_gene_sets(adj, names)
+    all_genes = [g for genes in comms.values() for g in genes]
+    assert sorted(all_genes) == sorted(names)

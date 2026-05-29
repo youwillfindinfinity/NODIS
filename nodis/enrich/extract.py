@@ -19,6 +19,7 @@ import networkx as nx
 
 _VALID_CENTRALITY = ("degree", "betweenness", "eigenvector")
 _VALID_RANK_METHODS = ("min_pvalue", "degree", "fisher_combined")
+_VALID_ALGORITHMS = ("greedy_modularity", "label_propagation")
 
 
 def hub_genes(
@@ -145,3 +146,78 @@ def ranked_genes(
                 scores[i] = float(-2.0 * np.sum(np.log(pv)))
 
     return pd.Series(scores, index=gene_names)
+
+
+def community_gene_sets(
+    adj: np.ndarray,
+    gene_names: list[str],
+    algorithm: str = "greedy_modularity",
+    min_size: int = 2,
+) -> dict[str, list[str]]:
+    """Partition genes into network communities using the inferred adjacency.
+
+    Parameters
+    ----------
+    adj : (p, p) ndarray
+        Binary symmetric adjacency matrix.
+    gene_names : list of str
+        Gene identifiers, length p.
+    algorithm : str, default ``"greedy_modularity"``
+        Community detection algorithm:
+
+        ``"greedy_modularity"``
+            Greedy modularity optimisation (Clauset-Newman-Moore).
+            Fast, works on disconnected graphs, no external deps.
+        ``"label_propagation"``
+            Label propagation (Raghavan et al., 2007). Faster on large graphs.
+    min_size : int, default 2
+        Communities smaller than this are merged into a ``"community_other"``
+        bucket.
+
+    Returns
+    -------
+    dict mapping ``"community_0"``, ``"community_1"``, … → list of gene names.
+    Singletons (size < min_size) go into ``"community_other"``.
+
+    Raises
+    ------
+    ValueError
+        If ``algorithm`` is not recognised.
+    """
+    if algorithm not in _VALID_ALGORITHMS:
+        raise ValueError(
+            f"algorithm must be one of {_VALID_ALGORITHMS}; got '{algorithm}'."
+        )
+
+    G = nx.from_numpy_array(adj)
+    mapping = {i: name for i, name in enumerate(gene_names)}
+    G = nx.relabel_nodes(G, mapping)
+
+    if algorithm == "greedy_modularity":
+        # Works on disconnected graphs
+        partition = nx.community.greedy_modularity_communities(G)
+    else:  # label_propagation
+        partition = nx.community.label_propagation_communities(G)
+
+    # Sort by size descending for stable labelling
+    partition = sorted(partition, key=len, reverse=True)
+
+    result: dict[str, list[str]] = {}
+    other: list[str] = []
+    comm_idx = 0
+    for comm in partition:
+        genes = sorted(comm)
+        if len(genes) >= min_size:
+            result[f"community_{comm_idx}"] = genes
+            comm_idx += 1
+        else:
+            other.extend(genes)
+
+    if other:
+        result["community_other"] = sorted(other)
+
+    # Edge case: empty graph or all singletons → put all genes in community_0
+    if not result:
+        result["community_0"] = sorted(gene_names)
+
+    return result
