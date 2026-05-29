@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from nodis.enrich.databases import get_databases, VALID_LEVELS
 from nodis.enrich.result import EnrichmentResult
 
 
@@ -97,9 +98,6 @@ def test_significant_missing_column_warns():
     with pytest.warns(UserWarning, match="adjusted_p_value"):
         result = er.significant(alpha=0.05)
     assert len(result) == 1  # full df returned
-
-
-from nodis.enrich.databases import get_databases, VALID_LEVELS
 
 
 def test_valid_levels():

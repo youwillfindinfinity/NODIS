@@ -15,6 +15,7 @@ from __future__ import annotations
 VALID_LEVELS = ("rna", "post_transcriptional", "protein", "all")
 
 # g:Profiler source identifiers
+# https://biit.cs.ut.ee/gprofiler/page/apis
 _GPROFILER: dict[str, list[str]] = {
     "rna": [
         "GO:BP",   # Gene Ontology - Biological Process
@@ -23,6 +24,7 @@ _GPROFILER: dict[str, list[str]] = {
         "KEGG",    # KEGG pathways
         "REAC",    # Reactome
         "WP",      # WikiPathways
+        "HP",      # Human Phenotype Ontology
     ],
     "post_transcriptional": [
         "MIRNA",      # miRNA targets (miRTarBase)
@@ -31,13 +33,13 @@ _GPROFILER: dict[str, list[str]] = {
     ],
     "protein": [
         "CORUM",      # Protein complexes
-        "HP",         # Human Phenotype Ontology
         "HPA",        # Human Protein Atlas - tissue expression
         "MSIGDB:C4",  # Cancer gene neighborhoods
     ],
 }
 
 # GSEApy / Enrichr library names
+# Full list: gseapy.get_library_name(organism="Human")
 _GSEAPY: dict[str, list[str]] = {
     "rna": [
         "GO_Biological_Process_2023",
