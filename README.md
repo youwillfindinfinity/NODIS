@@ -32,7 +32,7 @@ NODIS is the **first Python-native tool** to deliver these guarantees without re
 - **Benchmark suite** — parallel multi-method runner with AUPR, AUROC, F1, MCC, and SHD metrics against DREAM5 and SERGIO benchmarks
 - **Baseline estimators** — sklearn GraphicalLassoCV and GGLasso wrappers with a uniform API
 - **AnnData compatibility** — direct ingestion of `AnnData` objects for single-cell workflows
-- **CLI** — `nodis simulate / run / evaluate / plot` via Click
+- **CLI** — `nodis simulate / run / evaluate / enrich` via Click
 
 ---
 
@@ -121,12 +121,241 @@ est = from_anndata(adata, layer="log1p")
 est.fit()
 ```
 
-**CLI:**
+---
+
+## CLI Reference
+
+NODIS ships a `nodis` command-line tool built with Click. The four commands follow the natural scientific workflow: **simulate → run → evaluate → enrich**.
+
+```
+nodis [--version] [--help] COMMAND [ARGS]...
+```
+
+---
+
+### Scientific workflow order
+
+```
+1. nodis simulate   — generate benchmark data (or supply your own CSV)
+2. nodis run        — preprocess + fit GGM → edges with p-values
+3. nodis evaluate   — score predicted network against ground truth
+4. nodis enrich     — interpret the network biologically
+```
+
+---
+
+### 1. `nodis simulate` — Generate synthetic GGM datasets
+
+Generates `--reps` replicate datasets, each saved as a pickle file (`{topology}_n{n}_p{p}_rep{rep:03d}.pkl`).
+
 ```bash
-# Simulate a hub network and run inference
-nodis simulate --topology hub --n 200 --p 50 --out data/sim.pkl
-nodis run     --input data/sim.pkl --method desparsified --out results/
-nodis evaluate --results results/ --truth data/sim.pkl
+nodis simulate [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--n INT` | `200` | Number of samples |
+| `--p INT` | `100` | Number of genes (nodes) |
+| `--topology [hub\|scale-free\|cluster\|random]` | `hub` | Graph topology |
+| `--reps INT` | `10` | Number of replicates |
+| `--prob FLOAT` | `0.05` | Edge density (only used for `random` topology) |
+| `--seed INT` | `42` | Base random seed (replicate *i* uses `seed + i`) |
+| `--out PATH` | `results/simulated/` | Output directory |
+
+**Topologies:**
+- `hub` — star-shaped hubs, few high-degree nodes
+- `scale-free` — Barabási–Albert power-law degree distribution
+- `cluster` — block-diagonal (community) structure
+- `random` — Erdős–Rényi with edge probability `--prob`
+
+**Examples:**
+```bash
+# 20 hub replicates, 300 samples, 200 genes
+nodis simulate --topology hub --n 300 --p 200 --reps 20 --out data/sim/
+
+# Scale-free network, 5 replicates, fixed seed
+nodis simulate --topology scale-free --n 150 --p 80 --reps 5 --seed 0
+
+# Random sparse network (ER, 3% edge density)
+nodis simulate --topology random --prob 0.03 --n 200 --p 100
+```
+
+---
+
+### 2. `nodis run` — Fit a GGM and produce edge statistics
+
+Reads a CSV expression matrix (samples × genes, first column used as index) and writes p-values, z-scores, and the FDR-controlled adjacency matrix to `--out`.
+
+```bash
+nodis run --data PATH [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--data PATH` | *required* | Expression matrix CSV (samples × genes) |
+| `--method [desparsified\|glasso\|gglasso]` | `desparsified` | Inference method |
+| `--alpha FLOAT` | `0.05` | FDR threshold α |
+| `--fdr [BH\|BY]` | `BH` | FDR procedure (Benjamini–Hochberg or Benjamini–Yekutieli) |
+| `--npn` | off | Apply nonparanormal shrinkage before fitting |
+| `--out PATH` | `results/` | Output directory |
+
+**Output files (method = `desparsified`):**
+
+| File | Contents |
+|---|---|
+| `{stem}_pvalues.csv` | (p × p) two-sided edge p-values |
+| `{stem}_zscores.csv` | (p × p) de-sparsified z-scores |
+| `{stem}_adjacency.csv` | (p × p) binary FDR-controlled adjacency |
+
+For `glasso` and `gglasso` only `{stem}_adjacency.csv` is written (no p-values).
+
+**Methods:**
+- `desparsified` — de-sparsified nodewise Lasso (van de Geer et al. 2014); provides edge p-values and CIs
+- `glasso` — sklearn `GraphicalLassoCV`; produces a sparse precision matrix, no p-values
+- `gglasso` — GGLasso group graphical Lasso; requires `pip install gglasso`
+
+**Examples:**
+```bash
+# Full de-sparsified pipeline with NPN preprocessing
+nodis run --data expr.csv --method desparsified --npn --alpha 0.05 --out results/
+
+# Graphical Lasso baseline (no p-values)
+nodis run --data expr.csv --method glasso --out results/glasso/
+
+# Stricter FDR control with BY procedure
+nodis run --data expr.csv --npn --fdr BY --alpha 0.01 --out results/strict/
+```
+
+---
+
+### 3. `nodis evaluate` — Score predicted network against ground truth
+
+Computes classification metrics comparing a predicted adjacency to a known ground-truth adjacency. Optionally accepts a continuous score matrix for AUPR/AUROC.
+
+```bash
+nodis evaluate --predicted PATH --ground-truth PATH [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--predicted PATH` | *required* | Predicted adjacency CSV (binary, 0/1) |
+| `--ground-truth PATH` | *required* | Ground-truth adjacency CSV (binary, 0/1) |
+| `--scores PATH` | `None` | Continuous score matrix CSV (e.g. 1 − p-value) for AUPR/AUROC |
+| `--out PATH` | `results/metrics.csv` | Output metrics CSV |
+
+**Metrics reported:**
+
+| Metric | Notes |
+|---|---|
+| F1 | Harmonic mean of precision and recall |
+| MCC | Matthews Correlation Coefficient |
+| SHD | Structural Hamming Distance |
+| AUPR | Area under precision-recall curve (requires `--scores`) |
+| AUROC | Area under ROC curve (requires `--scores`) |
+
+**Examples:**
+```bash
+# Binary adjacency comparison only
+nodis evaluate \
+  --predicted  results/expr_adjacency.csv \
+  --ground-truth data/true_adj.csv \
+  --out results/metrics.csv
+
+# Full evaluation with continuous scores (AUPR + AUROC)
+nodis evaluate \
+  --predicted    results/expr_adjacency.csv \
+  --ground-truth data/true_adj.csv \
+  --scores       results/expr_pvalues.csv \
+  --out          results/metrics_full.csv
+```
+
+---
+
+### 4. `nodis enrich` — Topology-aware gene set enrichment
+
+Interprets a GGM adjacency matrix biologically by extracting hub genes or community structure and running enrichment analysis across three biological levels.
+
+```bash
+nodis enrich --adj PATH --genes PATH [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--adj PATH` | *required* | Binary adjacency matrix (`.npy`) |
+| `--genes PATH` | *required* | Text file with one gene name per line |
+| `--pvalues PATH` | `None` | Edge p-value matrix (`.npy`); required for `prerank` method |
+| `--level [rna\|post_transcriptional\|protein\|all]` | `all` | Biological level(s) to query |
+| `--method [ora\|prerank]` | `ora` | Enrichment method |
+| `--backend [gprofiler\|gseapy]` | `gprofiler` | Enrichment backend |
+| `--extraction [hub\|prerank\|community]` | `hub` | Gene extraction strategy from network |
+| `--organism STR` | `hsapiens` | Organism code (g:Profiler format) |
+| `--out PATH` | `enrichment_results.csv` | Output CSV |
+
+**Biological levels:**
+- `rna` — GO Biological Process/Molecular Function, KEGG, Reactome
+- `post_transcriptional` — miRNA targets, transcription factor motifs
+- `protein` — CORUM protein complexes, InterPro domains
+- `all` — all three combined
+
+**Gene extraction strategies:**
+- `hub` — top-degree nodes in the adjacency graph
+- `community` — genes per detected network community (Louvain/Leiden)
+- `prerank` — all genes ranked by edge p-value sum (requires `--pvalues`)
+
+**Examples:**
+```bash
+# ORA on hub genes, all biological levels
+nodis enrich \
+  --adj   results/expr_adjacency.npy \
+  --genes gene_list.txt \
+  --level all --method ora --extraction hub \
+  --out   enrichment.csv
+
+# GSEA prerank using edge p-values
+nodis enrich \
+  --adj      results/expr_adjacency.npy \
+  --genes    gene_list.txt \
+  --pvalues  results/expr_pvalues.npy \
+  --method   prerank --extraction prerank \
+  --backend  gseapy \
+  --out      gsea_results.csv
+
+# Protein-level enrichment for mouse data
+nodis enrich \
+  --adj results/adj.npy --genes genes.txt \
+  --level protein --organism mmusculus
+```
+
+---
+
+### End-to-end example (synthetic benchmark)
+
+```bash
+# 1. Generate 10 hub-topology replicates
+nodis simulate --topology hub --n 200 --p 100 --reps 10 --out data/sim/
+
+# 2. Run de-sparsified inference with NPN on replicate 0
+nodis run \
+  --data   data/sim/hub_n200_p100_rep000.csv \
+  --method desparsified \
+  --npn \
+  --alpha  0.05 \
+  --fdr    BH \
+  --out    results/rep000/
+
+# 3. Score against ground truth
+nodis evaluate \
+  --predicted    results/rep000/hub_n200_p100_rep000_adjacency.csv \
+  --ground-truth data/sim/hub_n200_p100_rep000_true_adj.csv \
+  --scores       results/rep000/hub_n200_p100_rep000_pvalues.csv \
+  --out          results/rep000/metrics.csv
+
+# 4. Biological enrichment
+nodis enrich \
+  --adj   results/rep000/hub_n200_p100_rep000_adjacency.npy \
+  --genes data/gene_names.txt \
+  --level all \
+  --out   results/rep000/enrichment.csv
 ```
 
 ---
@@ -208,7 +437,7 @@ pytest tests/integration/   # parity tests (requires R + SILGGM)
 
 If you use NODIS in your research, please cite:
 
-> **Bumbuc RV, Blei ZA** (2026). *NODIS: Python-native de-sparsified inference for Gaussian Graphical Models.* S
+> **Bumbuc RV** (2026). *NODIS: Python-native de-sparsified inference for Gaussian Graphical Models.* S
 ---
 
 ## Authors
