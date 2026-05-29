@@ -285,3 +285,83 @@ def test_lambda_monotone_with_scale():
     lam2 = model2._get_lambda(100, 50)
     lam3 = model3._get_lambda(100, 50)
     assert lam1 < lam2 < lam3
+
+
+# ---------------------------------------------------------------------------
+# Relaxed lambda (Shinkyu & Sueishi 2022)
+# ---------------------------------------------------------------------------
+
+def test_relaxed_lambda_formula():
+    """lambda_method='relaxed' must give lambda_scale / sqrt(n)."""
+    model = DesparifiedGGM(lambda_scale=2.0, lambda_method="relaxed")
+    lam = model._get_lambda(n=100, p=50)
+    expected = 2.0 / np.sqrt(100)
+    assert abs(lam - expected) < 1e-12, (
+        f"Relaxed lambda = {lam:.8f}; expected lambda_scale/sqrt(n) = {expected:.8f}."
+    )
+
+
+def test_relaxed_lambda_independent_of_p():
+    """Relaxed lambda must not depend on p."""
+    model = DesparifiedGGM(lambda_method="relaxed")
+    lam_p50 = model._get_lambda(n=100, p=50)
+    lam_p200 = model._get_lambda(n=100, p=200)
+    assert lam_p50 == lam_p200, (
+        "Relaxed lambda depends on p, but λ = lambda_scale/√n is p-independent."
+    )
+
+
+def test_relaxed_lambda_fit_produces_valid_result():
+    """Fitting with lambda_method='relaxed' must produce valid z-scores and p-values."""
+    data = generate(n=150, p=25, topology="hub", seed=99)
+    model = DesparifiedGGM(lambda_method="relaxed").fit(data.X)
+    res = model.result_
+    assert np.isfinite(res.z_scores).all(), "z_scores contain NaN/Inf under relaxed lambda"
+    assert np.isfinite(res.p_values).all(), "p_values contain NaN/Inf under relaxed lambda"
+    assert np.all(res.p_values >= 0.0) and np.all(res.p_values <= 1.0)
+
+
+def test_invalid_lambda_method_raises():
+    with pytest.raises(ValueError, match="lambda_method"):
+        DesparifiedGGM(lambda_method="oracle")
+
+
+# ---------------------------------------------------------------------------
+# Degrees-of-freedom correction (Bellec & Zhang 2022)
+# ---------------------------------------------------------------------------
+
+def test_dof_correction_fit_produces_valid_result():
+    """dof_correction=True must produce finite, valid outputs."""
+    data = generate(n=150, p=25, topology="cluster", seed=77)
+    model = DesparifiedGGM(dof_correction=True).fit(data.X)
+    res = model.result_
+    assert np.isfinite(res.z_scores).all(), "z_scores contain NaN/Inf with dof_correction"
+    assert np.isfinite(res.p_values).all(), "p_values contain NaN/Inf with dof_correction"
+    assert np.all(res.p_values >= 0.0) and np.all(res.p_values <= 1.0)
+
+
+def test_dof_correction_symmetry():
+    """DoF-corrected precision matrix must remain symmetric."""
+    data = generate(n=150, p=20, topology="scale-free", seed=55)
+    model = DesparifiedGGM(dof_correction=True).fit(data.X)
+    np.testing.assert_array_almost_equal(
+        model.result_.precision,
+        model.result_.precision.T,
+        decimal=10,
+    )
+
+
+def test_dof_correction_no_effect_when_all_zero():
+    """When the Lasso drives all coefficients to zero (very large lambda),
+    df_i = n for all nodes, so the DoF correction is a no-op.
+    """
+    data = generate(n=150, p=20, topology="random", seed=33)
+    # Very large lambda — Lasso will set all β to zero
+    model_base = DesparifiedGGM(lambda_scale=100.0, dof_correction=False).fit(data.X)
+    model_dof = DesparifiedGGM(lambda_scale=100.0, dof_correction=True).fit(data.X)
+    np.testing.assert_array_almost_equal(
+        model_base.result_.precision,
+        model_dof.result_.precision,
+        decimal=8,
+        err_msg="DoF correction should be a no-op when all Lasso coefficients are zero.",
+    )

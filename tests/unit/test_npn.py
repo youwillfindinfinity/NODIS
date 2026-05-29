@@ -1,12 +1,13 @@
 """
 Unit tests for the NPN (nonparanormal) preprocessing transform.
+Covers both the shrinkage variant and the SKEPTIC variant (Liu et al. 2012).
 """
 
 import numpy as np
 import pytest
 from scipy.stats import normaltest
 
-from nodis.preprocess.npn import npn_shrinkage
+from nodis.preprocess.npn import npn_shrinkage, npn_skeptic, npn_transform
 
 
 @pytest.fixture(scope="module")
@@ -100,3 +101,89 @@ def test_tie_breaking_average_rank():
     assert out[1, 0] < out[2, 0] < out[3, 0] < out[5, 0], (
         "Non-tied values are not strictly ordered after NPN transform."
     )
+
+
+# ---------------------------------------------------------------------------
+# NPN SKEPTIC tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def lognormal_data_large():
+    """Larger log-normal matrix for SKEPTIC tests (needs more samples for Kendall)."""
+    rng = np.random.default_rng(7)
+    return np.exp(rng.standard_normal((300, 20)))
+
+
+def test_skeptic_output_shape(lognormal_data_large):
+    out = npn_skeptic(lognormal_data_large)
+    assert out.shape == lognormal_data_large.shape
+
+
+def test_skeptic_output_dtype(lognormal_data_large):
+    out = npn_skeptic(lognormal_data_large)
+    assert out.dtype == float
+
+
+def test_skeptic_no_nan_or_inf(lognormal_data_large):
+    out = npn_skeptic(lognormal_data_large)
+    assert np.isfinite(out).all(), "SKEPTIC output contains NaN or Inf"
+
+
+def test_skeptic_spearman_variant(lognormal_data_large):
+    out = npn_skeptic(lognormal_data_large, corr_type="spearman")
+    assert out.shape == lognormal_data_large.shape
+    assert np.isfinite(out).all()
+
+
+def test_skeptic_invalid_corr_type():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((50, 5))
+    with pytest.raises(ValueError, match="corr_type"):
+        npn_skeptic(X, corr_type="pearson")
+
+
+def test_skeptic_invalid_input_raises():
+    with pytest.raises(ValueError, match="2-D"):
+        npn_skeptic(np.ones(10))
+
+
+def test_skeptic_corr_structure_preserved():
+    """After SKEPTIC, empirical Pearson correlations should reflect the
+    latent Gaussian structure: a strongly correlated pair in X should
+    remain positively correlated in the output.
+    """
+    rng = np.random.default_rng(42)
+    n, p = 200, 10
+    Z = rng.standard_normal((n, p))
+    # Introduce strong positive correlation between columns 0 and 1
+    Z[:, 1] = 0.9 * Z[:, 0] + 0.1 * rng.standard_normal(n)
+    X = np.exp(Z)  # log-normal
+    out = npn_skeptic(X, corr_type="kendall")
+    emp_corr = np.corrcoef(out.T)[0, 1]
+    assert emp_corr > 0.5, (
+        f"Expected positive correlation between columns 0 and 1 after SKEPTIC; "
+        f"got {emp_corr:.4f}."
+    )
+
+
+# ---------------------------------------------------------------------------
+# npn_transform dispatcher tests
+# ---------------------------------------------------------------------------
+
+def test_npn_transform_shrinkage_dispatches(lognormal_data):
+    out_direct = npn_shrinkage(lognormal_data)
+    out_dispatch = npn_transform(lognormal_data, method="shrinkage")
+    np.testing.assert_array_equal(out_direct, out_dispatch)
+
+
+def test_npn_transform_skeptic_dispatches(lognormal_data_large):
+    out_direct = npn_skeptic(lognormal_data_large)
+    out_dispatch = npn_transform(lognormal_data_large, method="skeptic")
+    np.testing.assert_array_equal(out_direct, out_dispatch)
+
+
+def test_npn_transform_invalid_method():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((50, 5))
+    with pytest.raises(ValueError, match="method"):
+        npn_transform(X, method="unknown")

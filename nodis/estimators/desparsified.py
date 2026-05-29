@@ -35,6 +35,14 @@ Zhang R, Ren Z, Chen W (2018). SILGGM: An extensive R package for efficient
     PLoS Comput Biol 14(8): e1006369. doi:10.1371/journal.pcbi.1006369
     [Reference implementation — used for parity validation in RQ1]
 
+Shinkyu P, Sueishi N (2022). Inference with de-sparsified Lasso under a
+    small tuning parameter. arXiv:2208.08679.
+    [Relaxed lambda_method: λ ~ 1/√n, weaker sparsity requirement]
+
+Bellec PC, Zhang C-H (2022). De-biasing the Lasso with degrees-of-freedom
+    adjustment. Bernoulli 28(2): 713–743. doi:10.3150/21-BEJ1348
+    [dof_correction: efficiency gain across all sparsity levels]
+
 Note
 ----
 Correctness of this implementation relative to SILGGM B_NW_SL is validated
@@ -57,7 +65,15 @@ from sklearn.preprocessing import StandardScaler
 
 def _fit_node(i: int, X: np.ndarray, lam: float, p: int,
               max_iter: int, tol: float):
-    """Fit one nodewise Lasso regression; called by joblib workers."""
+    """Fit one nodewise Lasso regression; called by joblib workers.
+
+    Returns
+    -------
+    i    : node index
+    tau2 : nodewise residual variance ||ẑ_i||² / n
+    coef : (p,) coefficient vector (zero at position i)
+    nnz  : number of non-zero coefficients (for DoF correction)
+    """
     mask = np.ones(p, dtype=bool)
     mask[i] = False
     lasso = Lasso(alpha=lam, fit_intercept=False, max_iter=max_iter, tol=tol)
@@ -66,7 +82,8 @@ def _fit_node(i: int, X: np.ndarray, lam: float, p: int,
     tau2 = float(np.dot(resid, resid) / len(resid))
     coef = np.zeros(p)
     coef[mask] = lasso.coef_
-    return i, tau2, coef
+    nnz = int(np.sum(lasso.coef_ != 0))
+    return i, tau2, coef, nnz
 
 
 @dataclass
@@ -100,6 +117,29 @@ class DesparifiedGGM:
     lambda_scale : float, default 1.0
         Multiplicative scaling of the Scaled Lasso tuning parameter.
         Full formula: λ = lambda_scale · √(2 log(p / √n) / n).
+    lambda_method : str, default 'scaled'
+        Tuning parameter formula.
+
+        'scaled'  — van de Geer et al. (2014) / Zhang & Zhang (2014):
+                    λ = lambda_scale · √(2 log(p / √n) / n).
+                    Requires sparsity s₀ = o(n / log p).  Matches SILGGM B_NW_SL.
+
+        'relaxed' — Shinkyu & Sueishi (2022, arXiv:2208.08679):
+                    λ = lambda_scale / √n.
+                    Weaker sparsity requirement: s₀ = o(√(n / log p)).
+                    Reduces bias when p/n is small; may increase variance.
+    dof_correction : bool, default False
+        Apply the degrees-of-freedom correction to the de-biased precision
+        entries (Bellec & Zhang 2022, doi:10.3150/21-BEJ1348).
+
+        When True, the de-biasing formula is adjusted by the effective
+        degrees of freedom of each nodewise Lasso fit:
+            df_i = n - ||β̂_i||₀   (number of non-zero coefficients)
+            ω̂_ij^{DoF} = ω̂_ij · n / mean(df_i, df_j)
+
+        This correction improves efficiency when sparsity is uncertain or
+        moderate (s₀ approaching n^{2/3}); it has no effect when all
+        β̂_i = 0 (fully sparse Lasso solution, df_i = n).
     standardise : bool, default True
         Centre and scale each column of X to zero mean and unit variance
         before fitting.  Strongly recommended; set to False only when X
@@ -118,12 +158,20 @@ class DesparifiedGGM:
     def __init__(
         self,
         lambda_scale: float = 1.0,
+        lambda_method: str = "scaled",
+        dof_correction: bool = False,
         standardise: bool = True,
         max_iter: int = 10_000,
         tol: float = 1e-6,
         n_jobs: int = 1,
     ) -> None:
+        if lambda_method not in ("scaled", "relaxed"):
+            raise ValueError(
+                f"lambda_method must be 'scaled' or 'relaxed'; got '{lambda_method}'."
+            )
         self.lambda_scale = lambda_scale
+        self.lambda_method = lambda_method
+        self.dof_correction = dof_correction
         self.standardise = standardise
         self.max_iter = max_iter
         self.tol = tol
@@ -134,18 +182,26 @@ class DesparifiedGGM:
     # ------------------------------------------------------------------
 
     def _get_lambda(self, n: int, p: int) -> float:
-        """Scaled Lasso tuning parameter λ_n = sqrt(2 log(p/√n) / n).
+        """Tuning parameter λ for nodewise Lasso regressions.
 
-        Formula matches SILGGM B_NW_SL exactly (SILGGMCpp.cpp line 801).
+        Two formulas are supported via ``self.lambda_method``:
 
-        Note: SILGGM implements the full iterative scaled Lasso (σ updated
-        per outer iteration), whereas NODIS uses this λ_n as a fixed penalty
-        in a standard Lasso.  The approximation achieves z-score Pearson
-        r > 0.99 with SILGGM on synthetic data (see tests/integration/).
+        'scaled' (default)
+            λ = lambda_scale · √(2 log(p / √n) / n)
+            Matches SILGGM B_NW_SL (SILGGMCpp.cpp line 801).
+            References: Zhang & Zhang (2014) JRSS-B Eq. 2.3;
+                        Zhang et al. (2018) PLoS Comput Biol Eq. S1.
 
-        References: Zhang & Zhang (2014) JRSS-B 76(1):217–242, Eq. 2.3;
-        Zhang et al. (2018) PLoS Comput Biol 14(8):e1006369, Eq. S1.
+        'relaxed'
+            λ = lambda_scale / √n
+            Shinkyu & Sueishi (2022, arXiv:2208.08679).
+            Reduces bias when p/n is small; relaxes sparsity requirement
+            from s₀ = o(n / log p) to s₀ = o(√(n / log p)).
         """
+        if self.lambda_method == "relaxed":
+            return self.lambda_scale / np.sqrt(n)
+
+        # 'scaled' path
         log_arg = p / np.sqrt(n)
         if log_arg > 1.0:
             return self.lambda_scale * np.sqrt(2.0 * np.log(log_arg) / n)
@@ -208,24 +264,27 @@ class DesparifiedGGM:
         # ----------------------------------------------------------------
         Beta = np.zeros((p, p))
         Tau2 = np.zeros(p)
+        Nnz = np.zeros(p, dtype=int)  # non-zero coef count per node (DoF correction)
 
         if self.n_jobs == 1:
             # Sequential path — no joblib overhead
             for i in range(p):
-                _, tau2_i, coef_i = _fit_node(
+                _, tau2_i, coef_i, nnz_i = _fit_node(
                     i, X, lam, p, self.max_iter, self.tol
                 )
                 Tau2[i] = tau2_i
                 Beta[i] = coef_i
+                Nnz[i] = nnz_i
         else:
             from joblib import Parallel, delayed
             results = Parallel(n_jobs=self.n_jobs)(
                 delayed(_fit_node)(i, X, lam, p, self.max_iter, self.tol)
                 for i in range(p)
             )
-            for i, tau2_i, coef_i in results:
+            for i, tau2_i, coef_i, nnz_i in results:
                 Tau2[i] = tau2_i
                 Beta[i] = coef_i
+                Nnz[i] = nnz_i
 
         # Guard against degenerate nodewise variance (near-perfect Lasso fit).
         # np.finfo(float).tiny (~5e-324) would cause -Beta[i,j]/tiny → ±inf in
@@ -256,13 +315,25 @@ class DesparifiedGGM:
         #
         # This averages the two nodewise estimates and is symmetric by
         # construction.  Asymptotic variance under H₀: σ̂²_ij = τ̂²_i · τ̂²_j.
+        #
+        # Optional DoF correction (Bellec & Zhang 2022):
+        #   df_i = n − ||β̂_i||₀   (effective degrees of freedom)
+        #   ω̂_ij^{DoF} = ω̂_ij · n / mean(df_i, df_j)
+        # Improves efficiency across all sparsity levels; no-op when Nnz=0.
         # ----------------------------------------------------------------
         Omega_hat = np.zeros((p, p))
         Var_hat = np.zeros((p, p))
 
+        # Effective degrees of freedom per node
+        Df = (n - Nnz).astype(float)
+        Df = np.maximum(Df, 1.0)  # guard: df >= 1
+
         for i in range(p):
             for j in range(i + 1, p):
                 omega_ij = (-Beta[i, j] / Tau2[i] - Beta[j, i] / Tau2[j]) / 2.0
+                if self.dof_correction:
+                    df_mean = (Df[i] + Df[j]) / 2.0
+                    omega_ij = omega_ij * n / df_mean
                 var_ij = Tau2[i] * Tau2[j]
                 Omega_hat[i, j] = Omega_hat[j, i] = omega_ij
                 Var_hat[i, j] = Var_hat[j, i] = var_ij
