@@ -153,5 +153,95 @@ def evaluate(predicted: str, ground_truth: str, scores: str | None, out: str) ->
             click.echo(f"  {k}: {v}")
 
 
+# ---------------------------------------------------------------------------
+# enrich
+# ---------------------------------------------------------------------------
+
+@main.command("enrich")
+@click.option("--adj", "adj_path", required=True, type=click.Path(exists=True),
+              help="Path to .npy binary adjacency matrix (FDR-controlled).")
+@click.option("--genes", "genes_path", required=True, type=click.Path(exists=True),
+              help="Path to a text file with one gene name per line.")
+@click.option("--pvalues", "pval_path", default=None, type=click.Path(exists=True),
+              help="Path to .npy edge p-value matrix (optional; required for prerank).")
+@click.option("--level", default="all",
+              type=click.Choice(["rna", "post_transcriptional", "protein", "all"]),
+              show_default=True, help="Biological level(s) to query.")
+@click.option("--method", default="ora",
+              type=click.Choice(["ora", "prerank"]),
+              show_default=True, help="Enrichment method.")
+@click.option("--backend", default="gprofiler",
+              type=click.Choice(["gprofiler", "gseapy"]),
+              show_default=True, help="Enrichment backend.")
+@click.option("--extraction", default="hub",
+              type=click.Choice(["hub", "prerank", "community"]),
+              show_default=True, help="Gene extraction strategy.")
+@click.option("--organism", default="hsapiens", show_default=True,
+              help="Organism code (g:Profiler format).")
+@click.option("--out", "out_path", default="enrichment_results.csv",
+              show_default=True, help="Output CSV path for enrichment results.")
+def enrich_cmd(adj_path, genes_path, pval_path, level, method, backend,
+               extraction, organism, out_path):
+    """Run topology-aware gene enrichment on a GGM adjacency matrix.
+
+    \b
+    Covers three biological levels:
+      rna                   GO terms, KEGG, Reactome
+      post_transcriptional  miRNA targets, TF motifs
+      protein               CORUM complexes, InterPro domains
+      all                   All three combined (default)
+
+    \b
+    Example:
+      nodis enrich --adj adj.npy --genes genes.txt --level all --out results.csv
+    """
+    from nodis.enrich import from_adjacency
+
+    adj = np.load(adj_path)
+    with open(genes_path) as fh:
+        gene_names = [line.strip() for line in fh if line.strip()]
+    p_values = np.load(pval_path) if pval_path else None
+
+    click.echo(
+        f"Running enrichment: level={level}, method={method}, "
+        f"backend={backend}, extraction={extraction}, "
+        f"genes={len(gene_names)}"
+    )
+
+    hits = from_adjacency(
+        adj=adj,
+        gene_names=gene_names,
+        p_values=p_values,
+        level=level,
+        method=method,
+        backend=backend,
+        extraction=extraction,
+        organism=organism,
+    )
+
+    if not hits:
+        click.echo("No enrichment results returned.")
+        return
+
+    frames = []
+    for h in hits:
+        if h.is_empty():
+            continue
+        df = h.results.copy()
+        df.insert(0, "gene_set_name", h.gene_set_name)
+        df.insert(1, "level", h.level)
+        df.insert(2, "backend", h.backend)
+        df.insert(3, "method", h.method)
+        frames.append(df)
+
+    if not frames:
+        click.echo("No significant enrichment found.")
+        return
+
+    out_df = pd.concat(frames, ignore_index=True)
+    out_df.to_csv(out_path, index=False)
+    click.echo(f"Saved {len(out_df)} enrichment terms to {out_path}")
+
+
 if __name__ == "__main__":
     main()
