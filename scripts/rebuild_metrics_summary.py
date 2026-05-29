@@ -6,6 +6,7 @@ a seed tag are treated as seed_offset=0.
 Usage (from NODIS/ root):
     python scripts/rebuild_metrics_summary.py
 """
+import os
 import pathlib
 import re
 import pandas as pd
@@ -25,32 +26,34 @@ def load_csv_with_seed(path: pathlib.Path) -> pd.DataFrame:
     return df
 
 
-sections = {
-    "synthetic": (list(results.glob("raw/results_*.csv")) +
-                  list(results.glob("glasso/synthetic/results_*.csv")) +
-                  list(results.glob("gglasso/synthetic/results_*.csv")) +
-                  list(results.glob("desparsified/synthetic/results_*.csv")) +
-                  list(results.glob("piglasso/synthetic/results_*.csv"))),
-    "dream5":    list(results.glob("dream5/dream5_*.csv")),
-    "diffusion": list(results.glob("diffusion/diffusion_*.csv")),
-    "sergio":    list(results.glob("sergio/sergio_*.csv")),
-}
+def main() -> None:
+    sections = {
+        "synthetic": (list(results.glob("raw/results_*.csv")) +
+                      list(results.glob("glasso/synthetic/results_*.csv")) +
+                      list(results.glob("gglasso/synthetic/results_*.csv")) +
+                      list(results.glob("desparsified/synthetic/results_*.csv")) +
+                      list(results.glob("piglasso/synthetic/results_*.csv"))),
+        "dream5":    list(results.glob("dream5/dream5_*.csv")),
+        "diffusion": list(results.glob("diffusion/diffusion_*.csv")),
+        "sergio":    list(results.glob("sergio/sergio_*.csv")),
+    }
 
-new_dfs = []
-found_benchmarks = set()
-for source, files in sections.items():
-    if not files:
-        print(f"  {source}: no files found — skipping")
-        continue
-    df = pd.concat([load_csv_with_seed(f) for f in files], ignore_index=True)
-    df["benchmark"] = source
-    new_dfs.append(df)
-    found_benchmarks.add(source)
-    print(f"  {source}: {len(files)} files, {len(df)} rows")
+    new_dfs = []
+    found_benchmarks = set()
+    for source, files in sections.items():
+        if not files:
+            print(f"  {source}: no files found — skipping")
+            continue
+        df = pd.concat([load_csv_with_seed(f) for f in files], ignore_index=True)
+        df["benchmark"] = source
+        new_dfs.append(df)
+        found_benchmarks.add(source)
+        print(f"  {source}: {len(files)} files, {len(df)} rows")
 
-if not new_dfs:
-    print("No result files found.")
-else:
+    if not new_dfs:
+        print("No result files found.")
+        return
+
     new_data = pd.concat(new_dfs, ignore_index=True)
 
     if summary_path.exists():
@@ -64,12 +67,13 @@ else:
         if "method" in new_data.columns and "seed_offset" in new_data.columns:
             new_keys = set(zip(new_data["benchmark"], new_data["method"],
                                new_data["config"], new_data["seed_offset"]))
-            mask_drop = existing.apply(
-                lambda r: (r.get("benchmark"), r.get("method"),
-                           r.get("config"), r.get("seed_offset", 0)) in new_keys,
-                axis=1
-            )
-            keep = existing[~mask_drop]
+            keep = existing[
+                ~pd.Series(
+                    list(zip(existing["benchmark"], existing["method"],
+                             existing["config"], existing.get("seed_offset", 0))),
+                    index=existing.index,
+                ).isin(new_keys)
+            ]
         else:
             keep = existing[~existing["benchmark"].isin(found_benchmarks)]
 
@@ -78,5 +82,11 @@ else:
     else:
         summary = new_data
 
-    summary.to_csv(summary_path, index=False)
+    tmp = summary_path.with_suffix(".tmp")
+    summary.to_csv(tmp, index=False)
+    os.rename(tmp, summary_path)
     print(f"Saved {len(summary)} total rows → {summary_path}")
+
+
+if __name__ == "__main__":
+    main()

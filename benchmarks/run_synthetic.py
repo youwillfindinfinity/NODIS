@@ -15,6 +15,7 @@ See jobs/synthetic_array.job for the SLURM wrapper.
 """
 
 import argparse
+import os
 import pathlib
 import pickle
 import time
@@ -135,21 +136,21 @@ def main() -> None:
         est = PIGLassoEstimator(n_jobs=args.n_jobs)
         est.fit(data.X)
         adj = est.get_adjacency()
-        scores = est.precision_
+        scores = np.abs(est.precision_)
 
     elif args.method == "piglasso":
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=args.n_jobs)
         est.fit(data.X)
         adj = est.get_adjacency()
-        scores = est.precision_
+        scores = np.abs(est.precision_)
 
     elif args.method == "piglasso_adaptive":
         from nodis.estimators.piglasso import PIGLassoEstimator
         est = PIGLassoEstimator(n_jobs=args.n_jobs, pi_thr="adaptive")
         est.fit(data.X)
         adj = est.get_adjacency()
-        scores = est.precision_
+        scores = np.abs(est.precision_)
 
     elif args.method == "piglasso_corr":
         from nodis.estimators.piglasso import PIGLassoEstimator
@@ -158,7 +159,7 @@ def main() -> None:
         est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
         est.fit(data.X, prior=prior)
         adj = est.get_adjacency()
-        scores = est.precision_
+        scores = np.abs(est.precision_)
 
     elif args.method.startswith("piglasso_oracle"):
         from nodis.estimators.piglasso import PIGLassoEstimator
@@ -174,7 +175,7 @@ def main() -> None:
         est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=args.prior_weight)
         est.fit(data.X, prior=prior)
         adj = est.get_adjacency()
-        scores = est.precision_
+        scores = np.abs(est.precision_)
 
     wall = time.perf_counter() - t0
 
@@ -194,12 +195,16 @@ def main() -> None:
     })
 
     if not result_file.exists():
-        pd.DataFrame([metrics]).to_csv(result_file, index=False)
+        tmp = result_file.with_suffix(".tmp")
+        pd.DataFrame([metrics]).to_csv(tmp, index=False)
+        os.rename(tmp, result_file)
         print(f"Saved: {result_file}  (AUPR={metrics['aupr']:.3f}, t={wall:.1f}s)")
 
     if args.method == "piglasso" and not adj_file.exists():
-        with open(adj_file, "wb") as fh:
+        tmp_adj = adj_file.with_suffix(".tmp")
+        with open(tmp_adj, "wb") as fh:
             pickle.dump(adj, fh, protocol=4)
+        os.rename(tmp_adj, adj_file)
         print(f"Saved adj: {adj_file}")
 
 

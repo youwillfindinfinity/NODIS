@@ -67,9 +67,9 @@ piglasso and piglasso_corr are statistically indistinguishable at all configs â€
 ### n1026p328 comparison (all methods)
 | Method | n | p | AUPR | AUROC | F1_opt | MCC | SHD |
 |---|---|---|---|---|---|---|---|
-| piglasso | 1026 | 328 | 0.638 | 0.895 | 0.629 | 0.532 | 2291 |
-| piglasso_adaptive | 1026 | 328 | 0.643 | 0.897 | 0.638 | 0.562 | 2254 |
-| piglasso_corr | 1026 | 328 | 0.639 | 0.895 | 0.629 | 0.534 | 2287 |
+| piglasso | 1026 | 328 | 0.638 | 0.895 | 0.680 | 0.532 | 2291 |
+| piglasso_adaptive | 1026 | 328 | 0.643 | 0.897 | 0.682 | 0.562 | 2254 |
+| piglasso_corr | 1026 | 328 | 0.639 | 0.895 | 0.680 | 0.534 | 2287 |
 
 piglasso_adaptive shows marginal improvement at n1026p328 (MCC +0.030 vs plain piglasso). High SHD at large n reflects edge-count explosion in dense n1026p328 networks.
 
@@ -106,9 +106,9 @@ KOSp_norm = normalised knockout Spearman.
 | Method | DiffSp_norm | KOSp_norm | KO_top10_recall |
 |---|---|---|---|
 | piglasso | **0.441** | **0.393** | **0.766** |
-| desparsified | 0.441 | 0.282 | 0.519 |
-| gglasso | 0.368 | 0.166 | 0.575 |
-| glasso | 0.261 | 0.194 | 0.633 |
+| desparsified | 0.449 | 0.315 | 0.528 |
+| gglasso | 0.368 | 0.287 | 0.638 |
+| glasso | 0.276 | 0.291 | 0.640 |
 
 **piglasso per topology:**
 

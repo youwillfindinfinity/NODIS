@@ -210,12 +210,11 @@ If you use NODIS in your research, please cite:
 | Name | Role | Affiliation |
 |------|------|-------------|
 | **Roland V. Bumbuc** | Lead developer, First and corresponding author | Amsterdam UMC, University of Amsterdam |
-| **Zoe Azra Blei** | Co-developer, First author author | Amsterdam UMC, University of Amsterdam |
 
-**Corresponding author:** Roland V. Bumbuc — rbumbuk@gmail.com
+**Corresponding author:** Roland V. Bumbuc — rbumbuc@gmail.com
 
 ---
 
 ## Licence
 
-MIT © 2026 Roland V. Bumbuc, Zoe Azra Blei
+MIT © 2026 Roland V. Bumbuc

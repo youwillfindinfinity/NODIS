@@ -19,40 +19,21 @@ Usage:
 
 import argparse
 import os
-import warnings
+import sys
 
-import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
-warnings.filterwarnings("ignore")
+sys.path.insert(0, os.path.dirname(__file__))
+import plot_style
+plot_style.apply()
 
 # ---------------------------------------------------------------------------
 # Style
 # ---------------------------------------------------------------------------
-matplotlib.rcParams.update({
-    "font.family":        "sans-serif",
-    "font.sans-serif":    ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size":          12,
-    "axes.labelsize":     13,
-    "axes.titlesize":     14,
-    "xtick.labelsize":    12,
-    "ytick.labelsize":    12,
-    "legend.fontsize":    12,
-    "figure.dpi":         300,
-    "axes.spines.top":    False,
-    "axes.spines.right":  False,
-    "axes.linewidth":     0.8,
-    "xtick.major.width":  0.8,
-    "ytick.major.width":  0.8,
-    "xtick.major.size":   3.5,
-    "ytick.major.size":   3.5,
-    "pdf.fonttype":       42,
-    "ps.fonttype":        42,
-})
 
 # ---------------------------------------------------------------------------
 # Constants

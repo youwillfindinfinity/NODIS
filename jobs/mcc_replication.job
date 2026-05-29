@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=mcc_repl
-#SBATCH --output=logs/mcc_repl_%A_%a.out
-#SBATCH --error=logs/mcc_repl_%A_%a.err
+#SBATCH --job-name=nodis_mcc_repl
+#SBATCH --output=logs/nodis_mcc_repl_%A_%a.out
+#SBATCH --error=logs/nodis_mcc_repl_%A_%a.err
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -12,10 +12,10 @@
 # Grid: 2 seeds × 5 methods × 3 configs × 4 topos × 50 reps = 6000 tasks
 # Each array job handles 10 tasks in parallel (600 array jobs total).
 #
-# Submit:
+# Submit (from NODIS repo root, after `mkdir -p logs`):
 #   sbatch --partition=rome jobs/mcc_replication.job
 
-NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+export NODIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 [[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
 source "$NODIS_DIR/.venv/bin/activate"
