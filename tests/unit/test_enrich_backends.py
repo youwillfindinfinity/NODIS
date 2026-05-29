@@ -24,8 +24,9 @@ def test_gprofiler_run_ora_returns_dataframe():
         }
     ], "meta": {}}
 
-    with patch("nodis.enrich.backends.gprofiler_backend.GProfiler",
-               return_value=mock_gp_instance):
+    mock_gprofiler_class = MagicMock(return_value=mock_gp_instance)
+    with patch("nodis.enrich.backends.gprofiler_backend._get_gprofiler",
+               return_value=mock_gprofiler_class):
         df = run_ora(
             gene_list=["TP53", "BCL2", "CASP3", "EGFR"],
             sources=["GO:BP", "CORUM"],
@@ -44,6 +45,65 @@ def test_gprofiler_run_ora_empty_gene_list_returns_empty():
     from nodis.enrich.backends.gprofiler_backend import run_ora
 
     df = run_ora(gene_list=[], sources=["GO:BP"], organism="hsapiens")
+    assert isinstance(df, pd.DataFrame)
+    assert df.empty
+
+
+def test_gprofiler_run_ora_dataframe_response():
+    """Test the DataFrame response path (primary production path with return_dataframe=True)."""
+    from nodis.enrich.backends.gprofiler_backend import run_ora
+
+    mock_df = pd.DataFrame({
+        "native": ["GO:0006915"],
+        "name": ["apoptotic process"],
+        "p_value": [0.001],
+        "source": ["GO:BP"],
+        "intersection_size": [3],
+        "query_size": [10],
+        "term_size": [200],
+        "intersections": [["TP53", "BCL2"]],
+    })
+    mock_gp_instance = MagicMock()
+    mock_gp_instance.profile.return_value = mock_df
+    mock_gprofiler_class = MagicMock(return_value=mock_gp_instance)
+
+    with patch("nodis.enrich.backends.gprofiler_backend._get_gprofiler",
+               return_value=mock_gprofiler_class):
+        df = run_ora(gene_list=["TP53", "BCL2"], sources=["GO:BP"])
+
+    assert "term_id" in df.columns
+    assert "term_name" in df.columns
+    assert df.iloc[0]["term_id"] == "GO:0006915"
+
+
+def test_gprofiler_run_ora_none_response_returns_empty():
+    """Test that None response from profile() returns empty DataFrame."""
+    from nodis.enrich.backends.gprofiler_backend import run_ora
+
+    mock_gp_instance = MagicMock()
+    mock_gp_instance.profile.return_value = None
+    mock_gprofiler_class = MagicMock(return_value=mock_gp_instance)
+
+    with patch("nodis.enrich.backends.gprofiler_backend._get_gprofiler",
+               return_value=mock_gprofiler_class):
+        df = run_ora(gene_list=["TP53"], sources=["GO:BP"])
+
+    assert isinstance(df, pd.DataFrame)
+    assert df.empty
+
+
+def test_gprofiler_run_ora_empty_results_dict_returns_empty():
+    """Test that dict response with empty results list returns empty DataFrame."""
+    from nodis.enrich.backends.gprofiler_backend import run_ora
+
+    mock_gp_instance = MagicMock()
+    mock_gp_instance.profile.return_value = {"results": [], "meta": {}}
+    mock_gprofiler_class = MagicMock(return_value=mock_gp_instance)
+
+    with patch("nodis.enrich.backends.gprofiler_backend._get_gprofiler",
+               return_value=mock_gprofiler_class):
+        df = run_ora(gene_list=["TP53"], sources=["GO:BP"])
+
     assert isinstance(df, pd.DataFrame)
     assert df.empty
 
