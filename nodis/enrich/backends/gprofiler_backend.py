@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import pandas as pd
 
-try:
-    from gprofiler import GProfiler  # type: ignore[import]
-except ImportError as exc:
-    raise ImportError(
-        "gprofiler-official is required for the gprofiler backend.\n"
-        "Install it with: pip install gprofiler-official\n"
-        "Or install all enrichment dependencies: pip install 'nodis[enrich]'"
-    ) from exc
+def _get_gprofiler():
+    """Deferred import — raises informative error if gprofiler-official is absent."""
+    try:
+        from gprofiler import GProfiler  # type: ignore[import]
+        return GProfiler
+    except ImportError as exc:
+        raise ImportError(
+            "gprofiler-official is required for the gprofiler backend.\n"
+            "Install it with: pip install gprofiler-official\n"
+            "Or install all enrichment dependencies: pip install 'nodis[enrich]'"
+        ) from exc
 
 _OUTPUT_COLUMNS = ["term_id", "term_name", "p_value", "adjusted_p_value",
                    "source", "intersection_size", "query_size", "term_size",
@@ -59,6 +62,7 @@ def run_ora(
     if not gene_list:
         return pd.DataFrame(columns=_OUTPUT_COLUMNS)
 
+    GProfiler = _get_gprofiler()
     gp = GProfiler(return_dataframe=True)
 
     kwargs: dict = {
@@ -97,6 +101,9 @@ def run_ora(
     # Add adjusted_p_value if not present (gprofiler already applies MHT)
     if "adjusted_p_value" not in df.columns and "p_value" in df.columns:
         df = df.copy()
+        # Proxy: g:Profiler dict response does not include a separate BH-adjusted column;
+        # p_value from the profile() dict path is the raw (unadjusted) value.
+        # Downstream significant() filtering will use this proxy conservatively.
         df["adjusted_p_value"] = df["p_value"]
 
     present = [c for c in _OUTPUT_COLUMNS if c in df.columns]
