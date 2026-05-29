@@ -27,6 +27,10 @@ dependencies = [
 [project.optional-dependencies]
 r = ["rpy2>=3.5"]
 gglasso = ["gglasso>=0.3"]
+enrich = [
+    "gseapy>=1.0",
+    "gprofiler-official>=1.0",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
