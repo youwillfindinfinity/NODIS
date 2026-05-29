@@ -20,9 +20,8 @@ Usage:
 
 import argparse
 import os
-import warnings
+import sys
 
-import matplotlib
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -30,31 +29,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-warnings.filterwarnings("ignore")
-
-# ---------------------------------------------------------------------------
-# Global style
-# ---------------------------------------------------------------------------
-matplotlib.rcParams.update({
-    "font.family":        "sans-serif",
-    "font.sans-serif":    ["Arial", "Helvetica", "DejaVu Sans"],
-    "font.size":          12,
-    "axes.labelsize":     13,
-    "axes.titlesize":     14,
-    "xtick.labelsize":    12,
-    "ytick.labelsize":    12,
-    "legend.fontsize":    12,
-    "figure.dpi":         300,
-    "axes.spines.top":    False,
-    "axes.spines.right":  False,
-    "axes.linewidth":     0.8,
-    "xtick.major.width":  0.8,
-    "ytick.major.width":  0.8,
-    "xtick.major.size":   3.5,
-    "ytick.major.size":   3.5,
-    "pdf.fonttype":       42,
-    "ps.fonttype":        42,
-})
+sys.path.insert(0, os.path.dirname(__file__))
+import plot_style
+plot_style.apply()
 
 # ---------------------------------------------------------------------------
 # Colour + method metadata
@@ -84,7 +61,7 @@ ZO_PIG  = 5
 ZO_BASE = 2
 
 TOPOS = ["cluster", "hub", "random", "scale-free"]
-CONFIGS_SMALL3 = ["n513p164"]
+CONFIGS_BENCHMARK = ["n513p164"]
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
@@ -99,7 +76,7 @@ def _grand_means(df: pd.DataFrame) -> pd.DataFrame:
     """Mean ± SD MCC across seed replications (grand mean per seed, then SD across seeds)."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
-        (df["config"].isin(CONFIGS_SMALL3))
+        (df["config"].isin(CONFIGS_BENCHMARK))
     ]
     seed_col = "seed_offset" if "seed_offset" in small3.columns else None
     rows = []
@@ -121,7 +98,7 @@ def _per_topology(df: pd.DataFrame) -> pd.DataFrame:
     """Mean ± SD MCC per (method, topology) across seed replications."""
     small3 = df[
         (df["benchmark"] == "synthetic") &
-        (df["config"].isin(CONFIGS_SMALL3))
+        (df["config"].isin(CONFIGS_BENCHMARK))
     ]
     seed_col = "seed_offset" if "seed_offset" in small3.columns else None
     rows = []
@@ -147,7 +124,7 @@ def _per_topology(df: pd.DataFrame) -> pd.DataFrame:
 # Panel A — Grand-mean MCC horizontal bar chart
 # ---------------------------------------------------------------------------
 
-def _grand_mean_bars(ax, grand: pd.DataFrame, title: str):
+def _grand_mean_bars(ax, grand: pd.DataFrame):
     grand = grand.sort_values("MCC", ascending=True).reset_index(drop=True)
     methods = grand["method"].tolist()
     values  = grand["MCC"].tolist()
@@ -183,7 +160,7 @@ def _grand_mean_bars(ax, grand: pd.DataFrame, title: str):
 # Panel B — MCC per topology grouped bar chart
 # ---------------------------------------------------------------------------
 
-def _per_topology_bars(ax, per_topo: pd.DataFrame, title: str):
+def _per_topology_bars(ax, per_topo: pd.DataFrame):
     methods = [m for m in METHODS_ORDER if m in per_topo["method"].unique()]
     n_topo  = len(TOPOS)
     n_meth  = len(methods)
@@ -238,12 +215,10 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                    top=0.85, bottom=0.12)
 
     ax_A = fig.add_subplot(gs[0, 0])
-    _grand_mean_bars(ax_A, grand,
-                     title="A   Grand-mean MCC (synthetic, all topologies)")
+    _grand_mean_bars(ax_A, grand)
 
     ax_B = fig.add_subplot(gs[0, 1])
-    _per_topology_bars(ax_B, per_topo,
-                       title="B   MCC by network topology")
+    _per_topology_bars(ax_B, per_topo)
 
     # Shared legend
     methods_legend = [m for m in METHODS_ORDER if m in df["method"].unique()]

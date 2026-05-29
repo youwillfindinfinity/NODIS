@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=mcc_vs_n
-#SBATCH --output=logs/mcc_vs_n_%A_%a.out
-#SBATCH --error=logs/mcc_vs_n_%A_%a.err
+#SBATCH --job-name=nodis_mcc_vs_n
+#SBATCH --output=logs/nodis_mcc_vs_n_%A_%a.out
+#SBATCH --error=logs/nodis_mcc_vs_n_%A_%a.err
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -11,10 +11,10 @@
 # Grid: 8 n-values × 4 topologies × 2 methods × 20 reps = 1280 tasks
 # Each array job handles 8 tasks in parallel (160 array jobs total).
 #
-# Submit:
+# Submit (from NODIS repo root, after `mkdir -p logs`):
 #   sbatch --partition=rome jobs/mcc_vs_n.job
 
-NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+export NODIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 [[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
 source "$NODIS_DIR/.venv/bin/activate"
