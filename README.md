@@ -1,10 +1,16 @@
-# NODIS — NOdewise De-sparsified Inference Statistics
+<p align="center">
+  <img src="NODIS_logo.png" alt="NODIS logo" width="480"/>
+</p>
 
-**Python-native statistical inference for Gaussian Graphical Models**
+<h1 align="center">NODIS — NOdewise De-sparsified Inference Statistics</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
-[![Version](https://img.shields.io/badge/version-0.1.0-green)](pyproject.toml)
+<p align="center"><strong>Python-native statistical inference for Gaussian Graphical Models</strong></p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
+  <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python"/></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.0-green" alt="Version"/></a>
+</p>
 
 ---
 
