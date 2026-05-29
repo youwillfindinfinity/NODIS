@@ -86,21 +86,21 @@ def run_prerank(
         return pd.DataFrame(columns=_PRERANK_OUTPUT_COLS)
 
     rename: dict[str, str] = {}
-    col_map = {
-        "Term": "term_name",
-        "NOM p-val": "p_value",
-        "FGSEA p-val": "p_value",
-        "FDR q-val": "adjusted_p_value",
-        "Lead_genes": "lead_genes",
-    }
-    for old, new in col_map.items():
-        if old in df.columns and new not in df.columns:
-            rename[old] = new
+    if "Term" in df.columns and "term_name" not in df.columns:
+        rename["Term"] = "term_name"
+    # Use NOM p-val (classic gseapy) or FGSEA p-val (fgsea mode) — mutually exclusive
+    if "NOM p-val" in df.columns and "p_value" not in df.columns:
+        rename["NOM p-val"] = "p_value"
+    elif "FGSEA p-val" in df.columns and "p_value" not in df.columns:
+        rename["FGSEA p-val"] = "p_value"
+    if "FDR q-val" in df.columns and "adjusted_p_value" not in df.columns:
+        rename["FDR q-val"] = "adjusted_p_value"
+    if "Lead_genes" in df.columns and "lead_genes" not in df.columns:
+        rename["Lead_genes"] = "lead_genes"
     df = df.rename(columns=rename).copy()
 
     present = [c for c in _PRERANK_OUTPUT_COLS if c in df.columns]
-    extra = [c for c in ["ES", "NES"] if c in df.columns and c not in present]
-    return df[present + extra].reset_index(drop=True)
+    return df[present].reset_index(drop=True)
 
 
 def run_ora(
