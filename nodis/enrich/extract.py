@@ -52,10 +52,18 @@ def hub_genes(
     ValueError
         If ``centrality`` is not a recognised measure.
     """
+    if adj.ndim != 2 or adj.shape[0] != adj.shape[1]:
+        raise ValueError("adj must be a square 2-D array.")
+    if len(gene_names) != adj.shape[0]:
+        raise ValueError(
+            f"gene_names length ({len(gene_names)}) must match adj dimension ({adj.shape[0]})."
+        )
     if centrality not in _VALID_CENTRALITY:
         raise ValueError(
             f"centrality must be one of {_VALID_CENTRALITY}; got '{centrality}'."
         )
+    if adj.sum() == 0:
+        return []
 
     G = nx.from_numpy_array(adj)
     mapping = {i: name for i, name in enumerate(gene_names)}
@@ -69,7 +77,7 @@ def hub_genes(
         try:
             scores = nx.eigenvector_centrality(G, max_iter=1000, tol=1e-6)
         except nx.PowerIterationFailedConvergence:
-            # Fall back to degree when eigenvector fails (disconnected graph)
+            # Fall back to degree if power iteration fails to converge
             scores = {k: float(v) for k, v in dict(G.degree()).items()}
 
     score_series = pd.Series(scores)
@@ -105,8 +113,9 @@ def ranked_genes(
         ``"degree"``
             Score = node degree (number of significant edges).
         ``"fisher_combined"``
-            Score = Fisher's combined −log10(p) across all significant
-            incident edges per gene.
+            Score = Fisher's combined statistic: −2 · Σ ln(p_i) across all
+            significant incident edges per gene (chi-squared distributed
+            under H₀).
 
     Returns
     -------
@@ -118,6 +127,14 @@ def ranked_genes(
     ValueError
         If ``method`` is not recognised.
     """
+    if adj.ndim != 2 or adj.shape[0] != adj.shape[1]:
+        raise ValueError("adj must be a square 2-D array.")
+    if len(gene_names) != adj.shape[0]:
+        raise ValueError(
+            f"gene_names length ({len(gene_names)}) must match adj dimension ({adj.shape[0]})."
+        )
+    if p_values.shape != adj.shape:
+        raise ValueError("p_values must have the same shape as adj.")
     if method not in _VALID_RANK_METHODS:
         raise ValueError(
             f"method must be one of {_VALID_RANK_METHODS}; got '{method}'."

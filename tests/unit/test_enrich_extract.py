@@ -128,3 +128,22 @@ def test_community_gene_sets_disconnected():
     comms = community_gene_sets(adj, names)
     all_genes = [g for genes in comms.values() for g in genes]
     assert sorted(all_genes) == sorted(names)
+
+
+def test_hub_genes_empty_graph_returns_empty():
+    adj = np.zeros((5, 5), dtype=int)
+    names = [f"G{i}" for i in range(5)]
+    assert hub_genes(adj, names, centrality="degree", quantile=0.9) == []
+
+
+def test_hub_genes_shape_mismatch_raises():
+    adj = _make_adj(p=8)
+    with pytest.raises(ValueError, match="gene_names length"):
+        hub_genes(adj, ["A", "B"], centrality="degree", quantile=0.5)
+
+
+def test_ranked_genes_shape_mismatch_raises():
+    adj = _make_adj(p=8)
+    pvals = _make_pval(p=8)
+    with pytest.raises(ValueError, match="gene_names length"):
+        ranked_genes(adj, ["A", "B"], pvals, method="degree")
