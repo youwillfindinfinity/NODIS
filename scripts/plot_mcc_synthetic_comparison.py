@@ -207,7 +207,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     grand    = _grand_means(df)
     per_topo = _per_topology(df)
 
-    fig = plt.figure(figsize=(16, 5))
+    fig = plt.figure(figsize=(11, 5))
     gs  = GridSpec(1, 2, figure=fig,
                    width_ratios=[1, 1.8],
                    wspace=0.35,

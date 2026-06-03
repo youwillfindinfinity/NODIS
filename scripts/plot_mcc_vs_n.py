@@ -44,7 +44,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
         (df["config"].isin(CONFIGS))
     ].copy()
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(11, 5))
     fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.13)
 
     for method, (label, color, marker, lbl_va, lbl_sign) in METHODS.items():
@@ -92,7 +92,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     ax.set_xlim(0, N_VALS[-1] + 100)
     ax.set_ylim(0.15, 1.05)
     ax.set_xticks(N_VALS)
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.1f}"))
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.legend(frameon=False, loc="lower right")
 
     return fig
