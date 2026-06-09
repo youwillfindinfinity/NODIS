@@ -52,6 +52,7 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 SMALL3 = ["n100p50", "n237p78", "n513p164"]
+ALL_CONFIGS = ["n100p50", "n237p78", "n513p164", "n1026p328"]
 TOPOS  = ["cluster", "hub", "random", "scale-free"]
 
 
@@ -61,7 +62,7 @@ TOPOS  = ["cluster", "hub", "random", "scale-free"]
 
 def _heatmap(ax, diff):
     methods  = [m for m in METHODS if m in diff["method"].unique()]
-    small3   = diff[diff["config"] == "n513p164"]
+    small3   = diff[diff["config"].isin(ALL_CONFIGS)]
     mat      = np.full((len(methods), len(TOPOS)), np.nan)
     for mi, m in enumerate(methods):
         for ti, t in enumerate(TOPOS):
@@ -88,14 +89,15 @@ def _heatmap(ax, diff):
                 continue
             txt_color = "white" if (v < 0.15 or v > 0.55) else "black"
             ax.text(ti, mi, f"{v:.2f}", ha="center", va="center",
-                    fontsize=10, color=txt_color, fontweight="normal")
+                    fontsize=13, color=txt_color, fontweight="normal")
 
     cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("Normalised diffusion recovery (Spearman ρ)", size=13)
-    cb.ax.tick_params(labelsize=12)
+    cb.set_label("Normalised diffusion recovery (Spearman ρ)", size=15)
+    cb.ax.tick_params(labelsize=13)
 
-    ax.set_xlabel("Network topology", fontsize=13)
-    ax.set_ylabel("Inference method", fontsize=13)
+    ax.set_xlabel("Network topology", fontsize=15)
+    ax.set_ylabel("Inference method", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.spines[:].set_visible(False)
 
 
@@ -104,7 +106,7 @@ def _heatmap(ax, diff):
 # ---------------------------------------------------------------------------
 
 def _delta_box(ax, diff):
-    d = diff[diff["config"] == "n513p164"].copy()
+    d = diff[diff["config"].isin(ALL_CONFIGS)].copy()
     methods = [m for m in METHODS if m in d["method"].unique()]
     delta_modes = sorted(d["delta_mode"].dropna().unique())
     n_delta = len(delta_modes)
@@ -141,8 +143,9 @@ def _delta_box(ax, diff):
     ax.set_xticks(np.arange(n_delta))
     dm_labels = {"fiedler": "Fiedler", "hub": "Hub", "random": "Random"}
     ax.set_xticklabels([dm_labels.get(d, d.capitalize()) for d in delta_modes])
-    ax.set_xlabel("Δ-signal mode")
-    ax.set_ylabel("Normalised diffusion recovery (Spearman ρ)")
+    ax.set_xlabel("Δ-signal mode", fontsize=15)
+    ax.set_ylabel("Normalised diffusion recovery (Spearman ρ)", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.axhline(0, color="#999999", linewidth=0.8, linestyle="--", alpha=0.7)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
 
@@ -152,7 +155,7 @@ def _delta_box(ax, diff):
 # ---------------------------------------------------------------------------
 
 def _knockout_bar(ax, diff):
-    small3   = diff[diff["config"] == "n513p164"]
+    small3   = diff[diff["config"].isin(ALL_CONFIGS)]
     methods  = [m for m in METHODS if m in small3["method"].unique()]
     n_topo   = len(TOPOS)
     n_meth   = len(methods)
@@ -182,8 +185,9 @@ def _knockout_bar(ax, diff):
 
     ax.set_xticks(np.arange(n_topo))
     ax.set_xticklabels([t for t in TOPOS])
-    ax.set_xlabel("Network topology")
-    ax.set_ylabel("Knockout top-10 recall")
+    ax.set_xlabel("Network topology", fontsize=15)
+    ax.set_ylabel("Knockout top-10 recall", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.set_ylim(0, 1.05)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
 
@@ -205,7 +209,7 @@ def _diffusion_vs_aupr(ax, df):
 
     for m in methods:
         xs, ys = [], []
-        for cfg in SMALL3:
+        for cfg in ALL_CONFIGS:
             for topo in TOPOS:
                 d_val = diff.loc[
                     (diff["method"] == m) & (diff["config"] == cfg) &
@@ -228,11 +232,12 @@ def _diffusion_vs_aupr(ax, df):
                    zorder=zo, label=LABELS[m], alpha=0.75)
 
     ax.axhline(0, color="#999999", linewidth=0.7, linestyle="--", alpha=0.6)
-    ax.set_xlabel("MCC (edge recovery)")
-    ax.set_ylabel("Normalised diffusion recovery\n(Spearman ρ)")
+    ax.set_xlabel("MCC (edge recovery)", fontsize=15)
+    ax.set_ylabel("Normalised diffusion recovery\n(Spearman ρ)", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
-    ax.legend(loc="lower right", frameon=False, fontsize=11)
+    ax.legend(loc="lower right", frameon=False, fontsize=13)
 
 
 
@@ -240,14 +245,20 @@ def _diffusion_vs_aupr(ax, df):
 # Build figure
 # ---------------------------------------------------------------------------
 
-def build_figure(df: pd.DataFrame) -> plt.Figure:
+def build_figure(df: pd.DataFrame, title=None) -> plt.Figure:
     diff = df[df["benchmark"] == "diffusion"]
+
+    top_val  = 0.87 if title else 0.93
+    legend_y = 0.95 if title else 1.00
 
     fig = plt.figure(figsize=(16, 11))
     gs  = GridSpec(2, 2, figure=fig,
-                   hspace=0.48, wspace=0.38,
+                   hspace=0.32, wspace=0.28,
                    left=0.07, right=0.97,
-                   top=0.93, bottom=0.09)
+                   top=top_val, bottom=0.09)
+
+    if title:
+        fig.suptitle(title, fontsize=21, fontweight="bold", y=1.00)
 
     ax_A = fig.add_subplot(gs[0, 0])
     ax_B = fig.add_subplot(gs[0, 1])
@@ -258,6 +269,11 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     _delta_box(ax_B, diff)
     _knockout_bar(ax_C, diff)
     _diffusion_vs_aupr(ax_D, df)
+
+    # Panel labels A–D
+    for ax, lbl in zip([ax_A, ax_B, ax_C, ax_D], ["A", "B", "C", "D"]):
+        ax.text(-0.04, 1.04, lbl, transform=ax.transAxes,
+                fontsize=18, fontweight="bold", va="bottom", ha="right")
 
     # Shared legend
     import matplotlib.patches as mpatches
@@ -271,7 +287,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                                       linewidth=lw, label=label))
 
     fig.legend(handles=handles, loc="upper center", ncol=len(methods),
-               frameon=False, fontsize=13, bbox_to_anchor=(0.5, 1.00),
+               frameon=False, fontsize=15, bbox_to_anchor=(0.5, legend_y),
                handlelength=1.5, handleheight=0.95, columnspacing=2.0)
 
     return fig
@@ -361,15 +377,16 @@ def main():
     df = pd.read_csv(SUMMARY_CSV)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
 
-    # Combined 4-panel figure
+    # Combined 4-panel figure (no title)
+    print("Building figure (no title) …")
     fig = build_figure(df)
-    fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved → {args.out}")
-    if args.out.endswith(".pdf"):
-        png = args.out.replace(".pdf", ".png")
-        fig.savefig(png, dpi=150, bbox_inches="tight")
-        print(f"Saved → {png}")
-    plt.close(fig)
+    _save(fig, args.out, args.dpi)
+
+    # Combined 4-panel figure (with title)
+    titled_out = args.out.replace(".pdf", "_titled.pdf")
+    print("Building figure (with title) …")
+    fig_t = build_figure(df, title="Diffusion and Knockout Recovery: Synthetic Benchmark (n=513, p=164)")
+    _save(fig_t, titled_out, args.dpi)
 
     # Individual panels
     base = args.out.replace(".pdf", "")

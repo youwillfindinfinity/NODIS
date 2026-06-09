@@ -110,8 +110,9 @@ def _oracle_panel(ax, data, metric, ylabel, title):
 
     ax.set_xticks(NOISE_X)
     ax.set_xticklabels(NOISE_LABELS)
-    ax.set_xlabel("Prior noise level (fraction of edges flipped)")
-    ax.set_ylabel(ylabel)
+    ax.set_xlabel("Prior noise level (fraction of edges flipped)", fontsize=15)
+    ax.set_ylabel(ylabel, fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda v, _: f"{v:.2f}")
     )
@@ -122,9 +123,16 @@ def _oracle_panel(ax, data, metric, ylabel, title):
 # ---------------------------------------------------------------------------
 
 def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
-                        panel_title: str) -> plt.Figure:
+                        panel_title=None) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(11, 5))
     fig.subplots_adjust(left=0.12, right=0.97, top=0.80, bottom=0.18)
+
+    if panel_title:
+        fig.suptitle(panel_title, fontsize=18, fontweight="bold", y=1.02)
+        legend_y = 0.93
+        fig.subplots_adjust(left=0.12, right=0.97, top=0.75, bottom=0.18)
+    else:
+        legend_y = 1.00
 
     _oracle_panel(ax, df, metric, ylabel, title=panel_title)
 
@@ -139,8 +147,8 @@ def build_single_figure(df: pd.DataFrame, metric: str, ylabel: str,
                               linestyle="--", label="SSGLasso baseline (no prior)")
 
     fig.legend(handles=topo_handles + [baseline_handle],
-               loc="upper center", ncol=5, frameon=False, fontsize=13,
-               bbox_to_anchor=(0.5, 1.00),
+               loc="upper center", ncol=5, frameon=False, fontsize=15,
+               bbox_to_anchor=(0.5, legend_y),
                handlelength=1.8, columnspacing=2.0)
 
 
@@ -179,14 +187,17 @@ def main():
         return
 
     print("Building AUPR figure …")
-    fig_aupr = build_single_figure(df, "aupr", "AUPR",
-                                   "AUPR vs. prior noise level (n=513, p=164)")
+    fig_aupr = build_single_figure(df, "aupr", "AUPR")
     _save(fig_aupr, args.out_aupr, args.dpi)
 
-    print("Building MCC figure …")
-    fig_mcc = build_single_figure(df, "mcc", "MCC",
-                                  "MCC vs. prior noise level (n=513, p=164)")
+    print("Building MCC figure (no title) …")
+    fig_mcc = build_single_figure(df, "mcc", "MCC")
     _save(fig_mcc, args.out_mcc, args.dpi)
+
+    print("Building MCC figure (with title) …")
+    fig_mcc_t = build_single_figure(df, "mcc", "MCC",
+                                    "MCC vs. Prior Noise Level (n=513, p=164)")
+    _save(fig_mcc_t, args.out_mcc.replace(".pdf", "_titled.pdf"), args.dpi)
 
 
 if __name__ == "__main__":

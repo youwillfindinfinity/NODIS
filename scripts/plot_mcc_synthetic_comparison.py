@@ -142,15 +142,16 @@ def _grand_mean_bars(ax, grand: pd.DataFrame):
                     elinewidth=0.9, capsize=3, capthick=0.9, zorder=zo + 1)
 
         ax.text(v + 0.012, i, f"{v:.3f}", va="center", ha="left",
-                fontsize=11,
+                fontsize=13,
                 color="#333333",
                 fontweight="bold" if m in PIG_METHODS else "normal",
                 zorder=zo + 2)
 
     ax.set_yticks(np.arange(n))
     ax.set_yticklabels([LABELS[m] for m in methods])
-    ax.set_xlabel("MCC")
-    ax.set_ylabel("Inference method")
+    ax.set_xlabel("MCC", fontsize=15)
+    ax.set_ylabel("Inference method", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.set_xlim(0, 1.02)
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.axvline(0, color="#bbbbbb", linewidth=0.6)
@@ -186,14 +187,15 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame):
                         elinewidth=0.8, capsize=2, capthick=0.8, zorder=zo + 1)
 
             ax.text(xp, v + sd + 0.015, f"{v:.2f}", ha="center", va="bottom",
-                    fontsize=9,
+                    fontsize=11,
                     color="#444444",
                     fontweight="bold" if m in PIG_METHODS else "normal")
 
     ax.set_xticks(np.arange(n_topo))
     ax.set_xticklabels([t for t in TOPOS])
-    ax.set_xlabel("Network topology")
-    ax.set_ylabel("MCC")
+    ax.set_xlabel("Network topology", fontsize=15)
+    ax.set_ylabel("MCC", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.set_ylim(0, 1.10)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
     ax.axhline(0, color="#bbbbbb", linewidth=0.6)
@@ -203,16 +205,22 @@ def _per_topology_bars(ax, per_topo: pd.DataFrame):
 # Build figure
 # ---------------------------------------------------------------------------
 
-def build_figure(df: pd.DataFrame) -> plt.Figure:
+def build_figure(df: pd.DataFrame, title=None) -> plt.Figure:
     grand    = _grand_means(df)
     per_topo = _per_topology(df)
+
+    top_val   = 0.78 if title else 0.85
+    legend_y  = 0.91 if title else 1.00
 
     fig = plt.figure(figsize=(11, 5))
     gs  = GridSpec(1, 2, figure=fig,
                    width_ratios=[1, 1.8],
                    wspace=0.35,
                    left=0.08, right=0.97,
-                   top=0.85, bottom=0.12)
+                   top=top_val, bottom=0.12)
+
+    if title:
+        fig.suptitle(title, fontsize=18, fontweight="bold", y=1.02)
 
     ax_A = fig.add_subplot(gs[0, 0])
     _grand_mean_bars(ax_A, grand)
@@ -231,10 +239,9 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                                       linewidth=lw, label=label))
 
     fig.legend(handles=handles, loc="upper center",
-               ncol=len(handles), frameon=False, fontsize=13,
-               bbox_to_anchor=(0.5, 1.00),
+               ncol=len(handles), frameon=False, fontsize=15,
+               bbox_to_anchor=(0.5, legend_y),
                handlelength=1.5, handleheight=0.95, columnspacing=1.8)
-
 
     return fig
 
@@ -254,19 +261,28 @@ def main():
     methods_found = sorted(df["method"].unique())
     print(f"  {len(df):,} rows \u2014 methods: {methods_found}")
 
-    print("Building figure \u2026")
-    fig = build_figure(df)
-
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+
+    print("Building figure (no title) \u2026")
+    fig = build_figure(df)
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
     print(f"Saved \u2192 {args.out}")
-
     if args.out.endswith(".pdf"):
         png_out = args.out.replace(".pdf", ".png")
         fig.savefig(png_out, dpi=150, bbox_inches="tight")
         print(f"Saved \u2192 {png_out}")
-
     plt.close(fig)
+
+    titled_out = args.out.replace(".pdf", "_titled.pdf")
+    print("Building figure (with title) \u2026")
+    fig_t = build_figure(df, title="MCC Comparison: Synthetic Benchmark (n=513, p=164)")
+    fig_t.savefig(titled_out, dpi=args.dpi, bbox_inches="tight")
+    print(f"Saved \u2192 {titled_out}")
+    if titled_out.endswith(".pdf"):
+        png_out_t = titled_out.replace(".pdf", ".png")
+        fig_t.savefig(png_out_t, dpi=150, bbox_inches="tight")
+        print(f"Saved \u2192 {png_out_t}")
+    plt.close(fig_t)
 
 
 if __name__ == "__main__":

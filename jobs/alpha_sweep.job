@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=alpha_sweep
+#SBATCH --output=logs/alpha_sweep_%A_%a.out
+#SBATCH --error=logs/alpha_sweep_%A_%a.err
+#SBATCH --time=06:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32768M
+#SBATCH --array=0-79
+# Prior-weight (alpha) sensitivity sweep for PIGLasso.
+# Grid: 9 alpha values × 4 topologies × 20 reps = 720 PIGLasso tasks
+#       + 4 topologies × 20 reps = 80 SSGLasso baseline tasks
+# Total: 800 tasks | 10 tasks/job × 80 array jobs
+#
+# Submit:
+#   sbatch --partition=rome jobs/alpha_sweep.job
+
+NODIS_DIR="/gpfs/home2/zblei/Documents/BurnInjuries/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+TOPOS=("scale-free" "hub" "cluster" "random")
+ALPHAS=(0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9)
+N_ALPHAS=9
+N_TOPOS=4
+N_REPS=20
+N_PIG=$((N_ALPHAS * N_TOPOS * N_REPS))   # 720
+N_BASE=$((N_TOPOS * N_REPS))              # 80
+TOTAL=$((N_PIG + N_BASE))                 # 800
+TASKS_PER_JOB=10
+
+mkdir -p "$NODIS_DIR/logs"
+mkdir -p "$NODIS_DIR/results/alpha_sweep/baseline"
+for a in "${ALPHAS[@]}"; do
+    tag=$(printf "a%02d" $(echo "$a * 10" | bc | cut -d. -f1))
+    mkdir -p "$NODIS_DIR/results/alpha_sweep/$tag"
+done
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    if [[ $FLAT -lt $N_PIG ]]; then
+        # --- PIGLasso alpha sweep ---
+        TOPO_IDX=$(( FLAT / (N_ALPHAS * N_REPS) ))
+        REM=$(( FLAT % (N_ALPHAS * N_REPS) ))
+        ALPHA_IDX=$(( REM / N_REPS ))
+        REP=$(( REM % N_REPS ))
+
+        TOPO=${TOPOS[$TOPO_IDX]}
+        ALPHA=${ALPHAS[$ALPHA_IDX]}
+        TAG=$(printf "a%02d" $(echo "$ALPHA * 10" | bc | cut -d. -f1))
+        OUT_DIR="$NODIS_DIR/results/alpha_sweep/$TAG"
+
+        echo "[$FLAT] PIGLasso topology=$TOPO alpha=$ALPHA rep=$REP"
+
+        python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+            --topology      "$TOPO"        \
+            --config        n513p164       \
+            --method        piglasso_oracle_n00 \
+            --prior-weight  "$ALPHA"       \
+            --rep           "$REP"         \
+            --out           "$OUT_DIR"     &
+
+    else
+        # --- SSGLasso baseline ---
+        BASE_FLAT=$(( FLAT - N_PIG ))
+        TOPO_IDX=$(( BASE_FLAT / N_REPS ))
+        REP=$(( BASE_FLAT % N_REPS ))
+        TOPO=${TOPOS[$TOPO_IDX]}
+
+        echo "[$FLAT] SSGLasso baseline topology=$TOPO rep=$REP"
+
+        python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+            --topology  "$TOPO"    \
+            --config    n513p164   \
+            --method    ssglasso   \
+            --rep       "$REP"     \
+            --out       "$NODIS_DIR/results/alpha_sweep/baseline" &
+    fi
+done
+
+wait

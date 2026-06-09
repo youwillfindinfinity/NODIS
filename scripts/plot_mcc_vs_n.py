@@ -38,7 +38,7 @@ SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 
 
-def build_figure(df: pd.DataFrame) -> plt.Figure:
+def build_figure(df: pd.DataFrame, title=None) -> plt.Figure:
     sub = df[
         (df["benchmark"] == "synthetic") &
         (df["config"].isin(CONFIGS))
@@ -46,6 +46,9 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
 
     fig, ax = plt.subplots(figsize=(11, 5))
     fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.13)
+
+    if title:
+        fig.suptitle(title, fontsize=18, fontweight="bold", y=0.98)
 
     for method, (label, color, marker, lbl_va, lbl_sign) in METHODS.items():
         means, sds, ns = [], [], []
@@ -79,7 +82,7 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
         for n, m, s in zip(np.array(N_VALS)[mask], means[mask], sds[mask]):
             y_txt = (m + s + 0.055) if lbl_sign > 0 else (m - s - 0.018)
             ax.text(n, y_txt, f"{m:.2f}",
-                    ha="center", va=lbl_va, fontsize=10,
+                    ha="center", va=lbl_va, fontsize=13,
                     fontweight="bold", color=color)
 
     ax.axhline(0.5, color="#4D9078", linewidth=1.6, linestyle="--",
@@ -87,13 +90,14 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     ax.axvline(513, color="#4C72B0", linewidth=1.6, linestyle=":",
                label="GSE182616 dataset (n=513)", zorder=1)
 
-    ax.set_xlabel("Sample size (n)")
-    ax.set_ylabel("MCC")
+    ax.set_xlabel("Sample size (n)", fontsize=15)
+    ax.set_ylabel("MCC", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.set_xlim(0, N_VALS[-1] + 100)
     ax.set_ylim(0.15, 1.05)
     ax.set_xticks(N_VALS)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
-    ax.legend(frameon=False, loc="lower right")
+    ax.legend(frameon=False, loc="lower right", fontsize=13)
 
     return fig
 
@@ -109,19 +113,30 @@ def main():
     configs_found = df.loc[df["config"].isin(CONFIGS), "config"].unique()
     print(f"  n-sweep configs found: {sorted(configs_found)}")
 
-    print("Building figure …")
-    fig = build_figure(df)
-
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+
+    # Without title
+    print("Building figure (no title) …")
+    fig = build_figure(df)
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
     print(f"Saved → {args.out}")
-
     if args.out.endswith(".pdf"):
         png_out = args.out.replace(".pdf", ".png")
         fig.savefig(png_out, dpi=150, bbox_inches="tight")
         print(f"Saved → {png_out}")
-
     plt.close(fig)
+
+    # With title
+    titled_out = args.out.replace(".pdf", "_titled.pdf")
+    print("Building figure (with title) …")
+    fig_t = build_figure(df, title="MCC vs Sample Size: SSGLasso and PIGLasso (p=160)")
+    fig_t.savefig(titled_out, dpi=args.dpi, bbox_inches="tight")
+    print(f"Saved → {titled_out}")
+    if titled_out.endswith(".pdf"):
+        png_out_t = titled_out.replace(".pdf", ".png")
+        fig_t.savefig(png_out_t, dpi=150, bbox_inches="tight")
+        print(f"Saved → {png_out_t}")
+    plt.close(fig_t)
 
 
 if __name__ == "__main__":
