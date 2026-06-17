@@ -1,0 +1,79 @@
+#!/bin/bash
+#SBATCH --job-name=nodis_dof
+#SBATCH --output=logs/dof_%A_%a.out
+#SBATCH --error=logs/dof_%A_%a.err
+#SBATCH --time=01:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M
+#SBATCH --array=0-87
+# Partition set at submission: sbatch --partition=$SNELLIUS_PARTITION jobs/dof_sweep.job
+#
+# Grid:
+#   DoF sweep  : 4 topos × 3 configs × 2 conditions (dof on/off) × 50 reps = 1200 runs
+#   Null graph : 4 configs × 50 reps                                          =  200 runs
+#   Total      : 1400 runs, 16 per job → 88 array slots (0-87)
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPOS=("hub" "scale-free" "cluster" "random")
+CONFIGS=("n100p50" "n237p78" "n513p164")
+N_REPS=50
+TASKS_PER_JOB=16
+
+# Flat task index layout:
+#   [0, 1200)  → DoF sweep tasks
+#   [1200, 1400) → null-graph tasks
+DOF_TOTAL=1200    # 4 × 3 × 2 × 50
+NULL_TOTAL=200    # 4 × 50
+TOTAL=1400
+
+mkdir -p "$HOME/NODIS/results/dof_sweep" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    if [[ $FLAT -lt $DOF_TOTAL ]]; then
+        # DoF sweep: flat = topo × config × condition × rep
+        TOPO_IDX=$(( FLAT / (3 * 2 * N_REPS) ))
+        REM1=$(( FLAT % (3 * 2 * N_REPS) ))
+        CFG_IDX=$(( REM1 / (2 * N_REPS) ))
+        REM2=$(( REM1 % (2 * N_REPS) ))
+        DOF_IDX=$(( REM2 / N_REPS ))
+        REP=$(( REM2 % N_REPS ))
+
+        TOPO=${TOPOS[$TOPO_IDX]}
+        CFG=${CONFIGS[$CFG_IDX]}
+        DOF_FLAG=""
+        [[ $DOF_IDX -eq 1 ]] && DOF_FLAG="--dof-correction"
+
+        echo "[$FLAT] DoF sweep: topo=${TOPO} cfg=${CFG} dof=${DOF_IDX} rep=${REP}"
+        python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+            --topology "$TOPO" \
+            --config   "$CFG"  \
+            --method   desparsified \
+            --rep      "$REP"  \
+            --out      "$HOME/NODIS/results/dof_sweep/" \
+            $DOF_FLAG &
+
+    else
+        # Null-graph FPR: flat = config × rep (offset by DOF_TOTAL)
+        NULL_FLAT=$(( FLAT - DOF_TOTAL ))
+        CFG_IDX=$(( NULL_FLAT / N_REPS ))
+        REP=$(( NULL_FLAT % N_REPS ))
+        CFG=${CONFIGS[$CFG_IDX]}
+
+        echo "[$FLAT] Null graph: cfg=${CFG} rep=${REP}"
+        python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+            --topology hub \
+            --config   "$CFG" \
+            --method   desparsified \
+            --rep      "$REP" \
+            --out      "$HOME/NODIS/results/dof_sweep/" \
+            --null-graph &
+    fi
+done
+
+wait
