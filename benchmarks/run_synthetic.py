@@ -68,19 +68,26 @@ def main() -> None:
                         help="Fraction of edge labels to flip for oracle prior (0–0.5).")
     parser.add_argument("--prior-weight", type=float, default=0.5,
                         help="Alpha in lambda_mask = 1 - alpha * prior.")
+    parser.add_argument("--dof-correction", action="store_true", default=False,
+                        help="Enable Bellec & Zhang (2022) DoF correction in desparsified.")
+    parser.add_argument("--null-graph", action="store_true", default=False,
+                        help="Override topology with an all-null (empty) graph for FPR calibration.")
     args = parser.parse_args()
 
     out_dir = pathlib.Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     seed_tag = f"_s{args.seed_offset:02d}" if args.seed_offset > 0 else ""
+    dof_tag = "_dof" if args.dof_correction else ""
+    null_tag = "_null" if args.null_graph else ""
+    topology_tag = "null" if args.null_graph else args.topology
     result_file = out_dir / (
-        f"results_{args.topology}_{args.config}"
-        f"_method_{args.method}{seed_tag}_rep{args.rep:03d}.csv"
+        f"results_{topology_tag}_{args.config}"
+        f"_method_{args.method}{dof_tag}{null_tag}{seed_tag}_rep{args.rep:03d}.csv"
     )
     adj_file = out_dir / (
-        f"adj_{args.topology}_{args.config}"
-        f"_method_{args.method}{seed_tag}_rep{args.rep:03d}.pkl"
+        f"adj_{topology_tag}_{args.config}"
+        f"_method_{args.method}{dof_tag}{null_tag}{seed_tag}_rep{args.rep:03d}.pkl"
     )
 
     # For piglasso, also require the adj pickle before skipping — it is needed
@@ -97,7 +104,21 @@ def main() -> None:
 
     n, p = CONFIGS[args.config]
     seed = args.seed_offset * 100_000 + args.rep * 1000 + hash(args.topology) % 1000
-    data = generate(n=n, p=p, topology=args.topology, prob=0.05, seed=seed)
+
+    if args.null_graph:
+        # All-null (empty) graph: X ~ N(0, I).  Used for FPR calibration benchmark.
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        X_null = rng.standard_normal((n, p))
+        # Wrap in a minimal namespace so downstream code matches the data.X API.
+        class _NullData:
+            def __init__(self, X, p):
+                import numpy as _np
+                self.X = X
+                self.Omega = _np.eye(p)  # true precision = identity; no off-diagonal edges
+        data = _NullData(X_null, p)
+    else:
+        data = generate(n=n, p=p, topology=args.topology, prob=0.05, seed=seed)
 
     # ----------------------------------------------------------------
     # Fit estimator
@@ -106,7 +127,7 @@ def main() -> None:
 
     if args.method == "desparsified":
         from nodis.estimators.desparsified import DesparifiedGGM
-        est = DesparifiedGGM()
+        est = DesparifiedGGM(dof_correction=args.dof_correction)
         est.fit(data.X)
         adj = est.get_adjacency(alpha=args.alpha)
         scores = np.abs(est.result_.z_scores)
@@ -184,9 +205,11 @@ def main() -> None:
     # ----------------------------------------------------------------
     metrics = evaluate_predictions(adj, data.Omega, scores=scores)
     metrics.update({
-        "topology": args.topology,
+        "topology": "null" if args.null_graph else args.topology,
         "config": args.config,
         "method": args.method,
+        "dof_correction": args.dof_correction,
+        "null_graph": args.null_graph,
         "rep": args.rep,
         "seed_offset": args.seed_offset,
         "n": n,
