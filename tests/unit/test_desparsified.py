@@ -365,3 +365,59 @@ def test_dof_correction_no_effect_when_all_zero():
         decimal=8,
         err_msg="DoF correction should be a no-op when all Lasso coefficients are zero.",
     )
+
+
+# ---------------------------------------------------------------------------
+# sparse=True mode
+# ---------------------------------------------------------------------------
+
+def test_sparse_mode_adjacency_matches_dense():
+    """sparse=True must produce the same FDR adjacency as the dense path."""
+    import warnings
+    data = generate(n=200, p=30, topology="hub", seed=7)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        adj_dense = DesparifiedGGM(sparse=False).fit(data.X).get_adjacency(alpha=0.05)
+        adj_sparse = DesparifiedGGM(sparse=True).fit(data.X).get_adjacency(alpha=0.05)
+    np.testing.assert_array_equal(adj_dense, adj_sparse)
+
+
+def test_sparse_mode_result_is_scipy_sparse():
+    """sparse=True result matrices must be scipy sparse, not ndarray."""
+    from scipy.sparse import issparse
+    import warnings
+    data = generate(n=150, p=20, topology="random", seed=3)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = DesparifiedGGM(sparse=True).fit(data.X)
+    res = model.result_
+    assert issparse(res.z_scores), "z_scores should be sparse when sparse=True"
+    assert issparse(res.p_values), "p_values should be sparse when sparse=True"
+    assert issparse(res.precision), "precision should be sparse when sparse=True"
+    assert issparse(res.variance), "variance should be sparse when sparse=True"
+
+
+def test_sparse_mode_shapes():
+    """Sparse result matrices must be (p, p)."""
+    import warnings
+    data = generate(n=150, p=20, topology="random", seed=5)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = DesparifiedGGM(sparse=True).fit(data.X)
+    p = 20
+    assert model.result_.z_scores.shape == (p, p)
+    assert model.result_.p_values.shape == (p, p)
+
+
+def test_sparse_mode_with_dof_correction():
+    """sparse=True and dof_correction=True must produce finite outputs."""
+    from scipy.sparse import issparse
+    import warnings
+    data = generate(n=200, p=25, topology="cluster", seed=9)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = DesparifiedGGM(sparse=True, dof_correction=True).fit(data.X)
+    res = model.result_
+    assert issparse(res.z_scores)
+    assert np.isfinite(res.z_scores.data).all()
+    assert np.isfinite(res.p_values.data).all()
