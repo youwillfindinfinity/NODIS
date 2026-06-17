@@ -66,7 +66,8 @@ def simulate(n: int, p: int, topology: str, reps: int, prob: float, seed: int, o
 # ---------------------------------------------------------------------------
 
 @main.command()
-@click.option("--data", required=True, help="Path to expression matrix CSV (samples × genes).")
+@click.option("--data", required=True,
+              help="Path to expression matrix CSV (samples × genes) or AnnData .h5ad file.")
 @click.option(
     "--method",
     default="desparsified",
@@ -78,38 +79,88 @@ def simulate(n: int, p: int, topology: str, reps: int, prob: float, seed: int, o
 @click.option("--fdr", default="BH", show_default=True,
               type=click.Choice(["BH", "BY"]), help="FDR procedure.")
 @click.option("--npn", is_flag=True, default=False, help="Apply NPN preprocessing.")
+@click.option("--use-hvg", is_flag=True, default=False,
+              help="Subset to highly variable genes (requires .h5ad input).")
+@click.option("--layer", default=None,
+              help="AnnData layer to extract (requires .h5ad input; default: .X).")
+@click.option("--output-anndata", is_flag=True, default=False,
+              help="Write results back into the .h5ad file (requires .h5ad input). "
+                   "Populates adata.obsp['nodis_connectivities'] and adata.uns['nodis'].")
 @click.option("--out", default="results/", show_default=True, help="Output directory.")
 def run(
-    data: str, method: str, alpha: float, fdr: str, npn: bool, out: str
+    data: str, method: str, alpha: float, fdr: str, npn: bool,
+    use_hvg: bool, layer: str | None, output_anndata: bool, out: str,
 ) -> None:
-    """Run GGM inference on an expression matrix."""
+    """Run GGM inference on an expression matrix.
+
+    Accepts a CSV file (samples × genes) or an AnnData .h5ad file.
+    With --output-anndata the FDR graph is written back into the .h5ad as
+    adata.obsp['nodis_connectivities'] in the format expected by scanpy/squidpy.
+    """
     out_dir = pathlib.Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    X = pd.read_csv(data, index_col=0).values.astype(float)
-    click.echo(f"Loaded expression matrix: {X.shape[0]} samples × {X.shape[1]} genes")
+    data_path = pathlib.Path(data)
+    stem = data_path.stem
+    is_h5ad = data_path.suffix.lower() == ".h5ad"
 
-    if npn:
-        from nodis.preprocess.npn import npn_shrinkage
-        X = npn_shrinkage(X)
-        click.echo("Applied NPN preprocessing.")
+    if output_anndata and not is_h5ad:
+        raise click.UsageError("--output-anndata requires --data to be an .h5ad file.")
 
+    # ----------------------------------------------------------------
+    # Load expression matrix
+    # ----------------------------------------------------------------
+    adata = None
+    if is_h5ad:
+        try:
+            import anndata as ad
+        except ImportError:
+            raise click.ClickException(
+                "anndata is not installed. Install it with: pip install anndata"
+            )
+        adata = ad.read_h5ad(data)
+        from nodis.preprocess.anndata_compat import from_anndata
+        X = from_anndata(adata, layer=layer, use_hvg=use_hvg, npn=npn)
+        click.echo(
+            f"Loaded AnnData: {adata.n_obs} obs × {adata.n_vars} vars"
+            + (f" → {X.shape[1]} HVGs" if use_hvg else "")
+        )
+    else:
+        X = pd.read_csv(data, index_col=0).values.astype(float)
+        click.echo(f"Loaded CSV: {X.shape[0]} samples × {X.shape[1]} genes")
+        if npn:
+            from nodis.preprocess.npn import npn_shrinkage
+            X = npn_shrinkage(X)
+            click.echo("Applied NPN preprocessing.")
+
+    # ----------------------------------------------------------------
+    # Fit estimator
+    # ----------------------------------------------------------------
     if method == "desparsified":
         from nodis.estimators.desparsified import DesparifiedGGM
         est = DesparifiedGGM()
         est.fit(X)
         adj = est.get_adjacency(alpha=alpha, method=fdr)
-        stem = pathlib.Path(data).stem
         pd.DataFrame(est.result_.p_values).to_csv(out_dir / f"{stem}_pvalues.csv", index=False)
         pd.DataFrame(est.result_.z_scores).to_csv(out_dir / f"{stem}_zscores.csv", index=False)
         pd.DataFrame(adj).to_csv(out_dir / f"{stem}_adjacency.csv", index=False)
+
+        if output_anndata:
+            from nodis.preprocess.anndata_compat import to_anndata
+            to_anndata(adata, est.result_)
+            out_h5ad = out_dir / f"{stem}_nodis.h5ad"
+            adata.write_h5ad(out_h5ad)
+            n_edges = est.result_.adj_fdr.sum() // 2
+            click.echo(
+                f"Wrote AnnData with {n_edges} edges → {out_h5ad} "
+                "(adata.obsp['nodis_connectivities'], adata.uns['nodis'])"
+            )
 
     elif method == "glasso":
         from nodis.estimators.glasso import SklearnGLasso
         est = SklearnGLasso()
         est.fit(X)
         adj = est.get_adjacency()
-        stem = pathlib.Path(data).stem
         pd.DataFrame(adj).to_csv(out_dir / f"{stem}_adjacency.csv", index=False)
 
     elif method == "gglasso":
@@ -117,7 +168,6 @@ def run(
         est = GGLassoEstimator()
         est.fit(X)
         adj = est.get_adjacency()
-        stem = pathlib.Path(data).stem
         pd.DataFrame(adj).to_csv(out_dir / f"{stem}_adjacency.csv", index=False)
 
     click.echo(f"Results written to {out_dir}")
