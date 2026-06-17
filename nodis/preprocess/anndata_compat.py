@@ -1,11 +1,17 @@
 """
-AnnData input adapter for NODIS.
+AnnData input/output adapters for NODIS.
 
-Extracts an expression matrix from an AnnData object and returns a plain
-``np.ndarray`` ready for NODIS inference.  AnnData is a soft dependency —
-the function uses duck-typed attribute access (``.X``, ``.layers``, ``.var``)
-rather than importing the package, so ``import nodis`` succeeds even without
-``anndata`` installed.
+``from_anndata`` extracts an expression matrix from an AnnData object and
+returns a plain ``np.ndarray`` ready for NODIS inference.
+
+``to_anndata`` writes NODIS inference results back into an AnnData object in
+the format expected by scanpy/squidpy graph-based operations:
+  - ``adata.obsp["{key}_connectivities"]`` — FDR edge graph (sparse float32)
+  - ``adata.uns["{key}"]``                 — run metadata dict
+
+AnnData is a soft dependency — both functions use duck-typed attribute access
+(``.X``, ``.layers``, ``.var``, ``.obsp``, ``.uns``) rather than importing the
+package, so ``import nodis`` succeeds without ``anndata`` installed.
 
 Typical usage
 -------------
@@ -14,10 +20,12 @@ Typical usage
 >>> sc.pp.normalize_total(adata)
 >>> sc.pp.log1p(adata)
 >>> sc.pp.highly_variable_genes(adata, n_top_genes=200)
->>> from nodis import from_anndata
+>>> from nodis import from_anndata, to_anndata, DesparifiedGGM
 >>> X = from_anndata(adata, layer="log1p_norm", use_hvg=True, npn=True)
->>> from nodis import DesparifiedGGM
 >>> est = DesparifiedGGM().fit(X)
+>>> est.get_adjacency(alpha=0.05)
+>>> to_anndata(adata, est.result_)
+>>> adata.obsp["nodis_connectivities"]   # scipy sparse gene×gene graph
 """
 
 import numpy as np
@@ -105,3 +113,72 @@ def from_anndata(
         X = npn_shrinkage(X)
 
     return X
+
+
+def to_anndata(
+    adata,
+    result,
+    key: str = "nodis",
+) -> None:
+    """
+    Write NODIS inference results back into an AnnData object in place.
+
+    Populates:
+
+    - ``adata.obsp[f"{key}_connectivities"]`` — FDR-surviving edges as a
+      ``scipy.sparse.csr_matrix`` (float32, symmetric, gene × gene).
+    - ``adata.uns[key]`` — run metadata dict with fields:
+      ``method``, ``fdr_alpha``, ``n_edges``, ``doi``.
+
+    The written format matches the convention used by scanpy and squidpy for
+    graph-based downstream operations (e.g. ``sc.tl.leiden``,
+    ``squidpy.gr.nhood_enrichment``).
+
+    Parameters
+    ----------
+    adata : AnnData
+        Object to write into.  Modified **in place**.  Uses only duck-typed
+        attribute access (``.obsp``, ``.uns``); no ``anndata`` import occurs.
+    result : GGMInferenceResult
+        Result object from ``DesparifiedGGM`` after calling ``get_adjacency()``.
+        ``result.adj_fdr`` must not be None.
+    key : str, default "nodis"
+        Namespace prefix for the written keys.
+
+    Raises
+    ------
+    ValueError
+        If ``result.adj_fdr`` is None (call ``get_adjacency()`` first).
+    AttributeError
+        If ``adata`` does not expose ``.obsp`` or ``.uns``.
+
+    Examples
+    --------
+    >>> est = DesparifiedGGM().fit(X)
+    >>> est.get_adjacency(alpha=0.05)
+    >>> to_anndata(adata, est.result_)
+    >>> adata.uns["nodis"]["n_edges"]
+    """
+    if result.adj_fdr is None:
+        raise ValueError(
+            "result.adj_fdr is None — call get_adjacency() before to_anndata()."
+        )
+    if not hasattr(adata, "obsp") or not hasattr(adata, "uns"):
+        raise AttributeError(
+            "adata must expose '.obsp' and '.uns' attributes (AnnData-like object expected)."
+        )
+
+    from scipy.sparse import csr_matrix
+
+    adj = np.asarray(result.adj_fdr, dtype=np.float32)
+    sparse_adj = csr_matrix(adj)
+
+    adata.obsp[f"{key}_connectivities"] = sparse_adj
+
+    n_edges = int(adj.sum()) // 2
+    adata.uns[key] = {
+        "method": "B_NW_SL",
+        "fdr_alpha": result.fdr_alpha,
+        "n_edges": n_edges,
+        "doi": "10.5281/zenodo.20452188",
+    }

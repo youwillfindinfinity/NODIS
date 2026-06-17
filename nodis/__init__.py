@@ -9,6 +9,6 @@ __version__ = "0.1.0"
 __author__ = "Roland Bumbuc"
 
 from nodis.estimators.desparsified import DesparifiedGGM, GGMInferenceResult
-from nodis.preprocess.anndata_compat import from_anndata
+from nodis.preprocess.anndata_compat import from_anndata, to_anndata
 
-__all__ = ["DesparifiedGGM", "GGMInferenceResult", "from_anndata"]
+__all__ = ["DesparifiedGGM", "GGMInferenceResult", "from_anndata", "to_anndata"]
