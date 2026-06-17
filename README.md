@@ -7,6 +7,7 @@
 <p align="center"><strong>Python-native statistical inference for Gaussian Graphical Models</strong></p>
 
 <p align="center">
+  <a href="https://github.com/youwillfindinfinity/nodis/actions/workflows/ci.yml"><img src="https://github.com/youwillfindinfinity/nodis/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python"/></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.0-green" alt="Version"/></a>
