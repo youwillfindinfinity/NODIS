@@ -99,3 +99,6 @@ site/
 _build/
 _static/
 _templates/
+
+# ── Paper / manuscript (local only) ─────────────────────────────────────────
+paper/
