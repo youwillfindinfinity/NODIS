@@ -107,7 +107,6 @@ def main() -> None:
 
     if args.null_graph:
         # All-null (empty) graph: X ~ N(0, I).  Used for FPR calibration benchmark.
-        import numpy as np
         rng = np.random.default_rng(seed)
         X_null = rng.standard_normal((n, p))
         # Wrap in a minimal namespace so downstream code matches the data.X API.
