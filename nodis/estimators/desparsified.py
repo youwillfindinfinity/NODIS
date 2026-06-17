@@ -287,7 +287,11 @@ class DesparifiedGGM:
         # Beta[i, j]: coefficient of X_j in the regression of X_i on X_{-i}
         # Tau2[i]:    nodewise residual variance ||ẑ_i||² / n
         # ----------------------------------------------------------------
-        Beta = np.zeros((p, p))
+        # When sparse=True, store Beta as a list of 1-D arrays so that each row
+        # can be freed individually during the pair-processing pass, keeping peak
+        # memory at O(p) declining rows rather than a full (p×p) block.
+        # Dense path uses a contiguous (p×p) array for fast indexing.
+        Beta: list | np.ndarray = [None] * p if self.sparse else np.zeros((p, p))
         Tau2 = np.zeros(p)
         Nnz = np.zeros(p, dtype=int)  # non-zero coef count per node (DoF correction)
 
@@ -397,59 +401,70 @@ class DesparifiedGGM:
     def _build_sparse_result(self, Beta, Tau2, Df, n, p, norm) -> "GGMInferenceResult":
         """Construct sparse inference result without materialising (p×p) dense matrices.
 
-        Streams through the upper triangle, accumulates values in flat 1-D
-        arrays, then packages them as scipy.sparse.csr_array.  Beta is freed
-        after the streaming pass to cap peak memory.
+        Memory profile vs dense at p=5,000 (float64 baseline):
+          Dense:  Beta 200 MB + 4 output matrices 800 MB  = 1,000 MB peak
+          Sparse: Beta rows freed progressively + float32 flat arrays
+                  Peak ≈ Beta 200 MB (declining) + 4×50 MB flat = ~400 MB
+                  Final stored: O(edges) sparse CSR arrays
 
-        Memory: O(p²/2) flat arrays during streaming (unavoidable: all pairs
-        are tested) → O(edges) sparse output after FDR.
+        Two key optimisations over a naive flat-array approach:
+        1. Beta stored as list-of-rows (when sparse=True in fit()) so each row
+           is freed with ``Beta[i] = None`` as soon as all pairs involving i as
+           the smaller index have been computed.
+        2. Flat arrays (omega, var, z, p) use float32 rather than float64,
+           halving their memory from ~100 MB to ~50 MB each at p=5,000.
+
+        Note: the symmetrised estimator requires Beta[i,j] AND Beta[j,i] for
+        every pair, so O(p²/2) coefficient storage is unavoidable in a single
+        pass.  The savings come from (a) progressive freeing and (b) float32.
         """
-        from scipy.sparse import csr_array
+        from scipy.sparse import csr_array, diags
 
         n_pairs = p * (p - 1) // 2
-        rows = np.empty(n_pairs, dtype=np.int32)
-        cols = np.empty(n_pairs, dtype=np.int32)
-        omega_flat = np.empty(n_pairs, dtype=np.float64)
-        var_flat = np.empty(n_pairs, dtype=np.float64)
+        rows_u = np.empty(n_pairs, dtype=np.int32)
+        cols_u = np.empty(n_pairs, dtype=np.int32)
+        omega_flat = np.empty(n_pairs, dtype=np.float32)
+        var_flat = np.empty(n_pairs, dtype=np.float32)
 
-        sqrt_n = np.sqrt(n)
+        sqrt_n = float(np.sqrt(n))
         idx = 0
         for i in range(p):
+            beta_i = Beta[i]
+            tau2_i = Tau2[i]
+            df_i = Df[i]
             for j in range(i + 1, p):
-                omega_ij = (-Beta[i, j] / Tau2[i] - Beta[j, i] / Tau2[j]) / 2.0
+                omega_ij = (-beta_i[j] / tau2_i - Beta[j][i] / Tau2[j]) / 2.0
                 if self.dof_correction:
-                    df_mean = (Df[i] + Df[j]) / 2.0
-                    omega_ij = omega_ij * n / df_mean
-                rows[idx] = i
-                cols[idx] = j
+                    omega_ij = omega_ij * n / ((df_i + Df[j]) / 2.0)
+                rows_u[idx] = i
+                cols_u[idx] = j
                 omega_flat[idx] = omega_ij
-                var_flat[idx] = Tau2[i] * Tau2[j]
+                var_flat[idx] = tau2_i * Tau2[j]
                 idx += 1
-
-        del Beta  # free the large (p×p) regression matrix
+            Beta[i] = None  # free row i; it is never needed again after this
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            z_flat = np.where(var_flat > 0, sqrt_n * omega_flat / np.sqrt(var_flat), 0.0)
-        p_flat = 2.0 * norm.sf(np.abs(z_flat))
+            z_flat = np.where(
+                var_flat > 0,
+                np.float32(sqrt_n) * omega_flat / np.sqrt(var_flat),
+                np.float32(0.0),
+            ).astype(np.float32)
+        p_flat = (2.0 * norm.sf(np.abs(z_flat))).astype(np.float32)
 
-        def _sym_csr(data_u, fill_diag=0.0):
-            # Build symmetric matrix from upper-triangle (rows, cols, data_u).
-            rows_sym = np.concatenate([rows, cols])
-            cols_sym = np.concatenate([cols, rows])
-            data_sym = np.concatenate([data_u, data_u])
-            mat = csr_array(
-                (data_sym, (rows_sym, cols_sym)), shape=(p, p), dtype=np.float64
-            )
+        def _sym_csr(data_u, fill_diag=0.0, dtype=np.float32):
+            rows_s = np.concatenate([rows_u, cols_u])
+            cols_s = np.concatenate([cols_u, rows_u])
+            data_s = np.concatenate([data_u, data_u])
+            mat = csr_array((data_s, (rows_s, cols_s)), shape=(p, p), dtype=dtype)
             if fill_diag != 0.0:
-                from scipy.sparse import diags
-                mat = mat + diags([fill_diag] * p, format="csr")
+                mat = mat + diags([fill_diag] * p, dtype=dtype, format="csr")
             return mat
 
         return GGMInferenceResult(
-            z_scores=_sym_csr(z_flat, fill_diag=0.0),
+            z_scores=_sym_csr(z_flat),
             p_values=_sym_csr(p_flat, fill_diag=1.0),
-            precision=_sym_csr(omega_flat, fill_diag=0.0),
-            variance=_sym_csr(var_flat, fill_diag=0.0),
+            precision=_sym_csr(omega_flat),
+            variance=_sym_csr(var_flat),
         )
 
     def get_adjacency(
