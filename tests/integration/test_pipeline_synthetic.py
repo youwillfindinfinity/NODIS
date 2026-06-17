@@ -58,3 +58,36 @@ def test_pipeline_completes_no_error():
     model = DesparifiedGGM().fit(data.X)
     adj = model.get_adjacency(alpha=0.05)
     assert adj.shape == (10, 10)
+
+
+@pytest.mark.parametrize("alpha", [0.01, 0.05, 0.10, 0.20])
+def test_all_null_fpr_calibration(alpha):
+    """Empirical FPR on a fully null graph must be ≤ 2·alpha (generous tolerance).
+
+    Generates data from N(0, I) so all off-diagonal Theta_ij = 0.  Under the
+    asymptotic null, BH at level alpha should produce FPR ≈ alpha on average.
+    We use a fast n=200, p=50 setting and allow 2× slack for finite-sample
+    variability at a single replicate.
+
+    This test validates the Type I error calibration claim (Figure 2 panel).
+    """
+    import warnings
+
+    rng = np.random.default_rng(seed=2024)
+    n, p = 200, 50
+    X = rng.standard_normal((n, p))
+    n_pairs = p * (p - 1) // 2
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = DesparifiedGGM().fit(X)
+
+    adj = model.get_adjacency(alpha=alpha)
+    n_false_positives = adj.sum() // 2
+    empirical_fpr = n_false_positives / n_pairs
+
+    assert empirical_fpr <= 2.0 * alpha, (
+        f"Empirical FPR = {empirical_fpr:.4f} > 2·alpha = {2 * alpha:.4f} "
+        f"at alpha={alpha} on null graph (n={n}, p={p}). "
+        "Type I error is not calibrated."
+    )
