@@ -439,7 +439,20 @@ pytest tests/integration/   # parity tests (requires R + SILGGM)
 
 If you use NODIS in your research, please cite:
 
-> **Bumbuc RV** (2026). *NODIS: Python-native de-sparsified inference for Gaussian Graphical Models.* S
+> **Bumbuc RV** (2026). *NODIS: Python-native de-sparsified inference for Gaussian Graphical Models.* Journal of Open Source Software. https://doi.org/10.5281/zenodo.20452188
+
+---
+
+## Contributors
+
+All-time line contributions (`git log --all --numstat`, added + deleted):
+
+| Rank | Contributor | Total Lines | Added | Deleted | Share |
+|:----:|-------------|------------:|------:|--------:|------:|
+| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 204,417 | +137,926 | −66,491 | 69.8% |
+| 🥈 | Zoe Azra | 52,098 | +31,541 | −20,557 | 17.8% |
+| 🥉 | Zoe Azra Blei | 36,130 | +19,465 | −16,665 | 12.3% |
+
 ---
 
 ## Authors
