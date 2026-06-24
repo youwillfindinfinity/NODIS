@@ -1,18 +1,20 @@
 #!/bin/bash
-#SBATCH --job-name=ssglasso_diff
-#SBATCH --output=logs/ssglasso_diff_%A_%a.out
-#SBATCH --error=logs/ssglasso_diff_%A_%a.err
-#SBATCH --time=01:00:00
+#SBATCH --job-name=pig_diff_hf
+#SBATCH --output=logs/pig_diff_hf_%A_%a.out
+#SBATCH --error=logs/pig_diff_hf_%A_%a.err
+#SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=28672M            # 16 × 1792 MiB — matches billing unit exactly
 #SBATCH --array=0-37            # 38 × 16 = 608 slots (covers 600 tasks)
-# Method: ssglasso — diffusion + knockout benchmark, all delta modes
-# Grid:   4 topologies × 3 configs × 50 reps = 600 tasks
-# Each task writes 3 CSVs (fiedler, hub, random delta modes).
+# Fill missing hub+fiedler delta modes for piglasso diffusion benchmark.
+# adj pickles already exist in results/raw/ so no re-fitting is done.
+# --delta all skips the existing random CSVs and writes only hub+fiedler.
+#
+# Grid: 4 topologies × 3 configs × 50 reps = 600 tasks
 #
 # Submit:
-#   sbatch --partition=rome jobs/ssglasso_diffusion.job
+#   sbatch --partition=rome jobs/piglasso_diffusion_hub_fiedler.job
 
 NODIS_DIR="$HOME/NODIS"
 
@@ -41,16 +43,17 @@ for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
     TOPO=${TOPOS[$TOPO_IDX]}
     CFG=${CONFIGS[$CFG_IDX]}
 
-    echo "[$FLAT] topology=${TOPO} config=${CFG} method=ssglasso rep=${REP}"
+    echo "[$FLAT] topology=${TOPO} config=${CFG} method=piglasso rep=${REP}"
 
     python "$NODIS_DIR/benchmarks/run_diffusion.py" \
         --topology "$TOPO"   \
         --config   "$CFG"    \
-        --method   ssglasso  \
+        --method   piglasso  \
         --rep      "$REP"    \
         --delta    all       \
         --mode     both      \
         --n-jobs   1         \
+        --adj-dir  "$NODIS_DIR/results/raw/" \
         --out      "$NODIS_DIR/results/diffusion/" &
 done
 

@@ -1,0 +1,54 @@
+#!/bin/bash
+#SBATCH --job-name=pig_n900_n1100
+#SBATCH --output=logs/pig_n900_n1100_%A_%a.out
+#SBATCH --error=logs/pig_n900_n1100_%A_%a.err
+#SBATCH --time=01:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G                # ~2 GB/task for 4 parallel tasks (n900/n1100 p=160 runs ~20 min each)
+#SBATCH --array=0-99            # 100 jobs × 4 tasks = 400 (2 configs × 4 topos × 50 reps)
+# Method: piglasso_oracle_n02 (20% noise) for the mcc-vs-n sweep
+# Grid:   2 configs (n900p160, n1100p160) × 4 topologies × 50 reps = 400 tasks
+#
+# Submit (from NODIS repo root, after `mkdir -p logs`):
+#   sbatch --partition=rome jobs/piglasso_oracle_n900_n1100.job
+
+NODIS_DIR="$HOME/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+CONFIGS=("n900p160" "n1100p160")
+TOPOS=("hub" "scale-free" "cluster" "random")
+N_REPS=50
+N_CONFIGS=2
+N_TOPOS=4
+TOTAL=$(( N_CONFIGS * N_TOPOS * N_REPS ))   # 400
+TASKS_PER_JOB=4
+
+mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    CONFIG_IDX=$(( FLAT / (N_TOPOS * N_REPS) ))
+    REM1=$(( FLAT % (N_TOPOS * N_REPS) ))
+    TOPO_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    CONFIG=${CONFIGS[$CONFIG_IDX]}
+    TOPO=${TOPOS[$TOPO_IDX]}
+
+    echo "[$FLAT] config=${CONFIG} topology=${TOPO} method=piglasso_oracle_n02 rep=${REP}"
+
+    python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+        --topology     "$TOPO"              \
+        --config       "$CONFIG"            \
+        --method       piglasso_oracle_n02  \
+        --rep          "$REP"               \
+        --prior-weight 0.5                  \
+        --out          "$NODIS_DIR/results/raw/" &
+done
+
+wait

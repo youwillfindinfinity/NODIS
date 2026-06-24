@@ -1,13 +1,12 @@
 """
 plot_mcc_vs_n.py
 -----------------
-MCC vs sample size (fixed p=160) for SSGLasso and PIGLasso.
-Reads from results/metrics_summary.csv.
+Nature-grade MCC vs. sample size figure (single column, 88 mm wide).
+SSGLasso vs. PIGLasso at fixed p=160.
 
 Usage:
     cd NODIS/
-    python scripts/plot_mcc_vs_n.py
-    python scripts/plot_mcc_vs_n.py --out figures/mcc_vs_n.pdf
+    python scripts/plot_mcc_vs_n.py [--out figures/mcc_vs_n.pdf]
 """
 
 import argparse
@@ -18,74 +17,66 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 
 sys.path.insert(0, os.path.dirname(__file__))
 import plot_style
 plot_style.apply()
 
-N_VALS   = [100, 300, 500, 700, 900, 1100, 1300, 1500]
-P        = 160
-CONFIGS  = [f"n{n}p{P}" for n in N_VALS]
+from plot_style import FULL_W, METHOD_PALETTE, panel_label, save
+
+N_VALS  = [100, 300, 500, 700, 900, 1100, 1300, 1500]
+P       = 160
+CONFIGS = [f"n{n}p{P}" for n in N_VALS]
 
 METHODS = {
-    "ssglasso":            ("SSGLasso", "#F2C14E", "o", "top",    -1),
-    "piglasso_oracle_n02": ("PIGLasso", "#B4436C", "o", "bottom", +1),
+    "ssglasso":            ("SSGLasso", METHOD_PALETTE["ssglasso"],            "o", -1),
+    "piglasso_oracle_n02": ("PIGLasso", METHOD_PALETTE["piglasso_oracle_n02"], "o", +1),
 }
-# label_va and label_side: "top"/−1 → label below point, "bottom"/+1 → label above cap
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "metrics_summary.csv")
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
 
 
-def build_figure(df: pd.DataFrame) -> plt.Figure:
-    sub = df[
-        (df["benchmark"] == "synthetic") &
-        (df["config"].isin(CONFIGS))
-    ].copy()
+def build_figure(df):
+    sub = df[(df["benchmark"] == "synthetic") & (df["config"].isin(CONFIGS))].copy()
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.13)
+    fig, ax = plt.subplots(figsize=(FULL_W, 3.2))
+    fig.subplots_adjust(left=0.09, right=0.97, top=0.88, bottom=0.15)
 
-    for method, (label, color, marker, lbl_va, lbl_sign) in METHODS.items():
-        means, sds, ns = [], [], []
+    for method, (label, color, marker, lbl_sign) in METHODS.items():
+        means, sds = [], []
         for n in N_VALS:
-            config = f"n{n}p{P}"
             vals = sub.loc[
-                (sub["method"] == method) & (sub["config"] == config), "mcc"
+                (sub["method"] == method) & (sub["config"] == f"n{n}p{P}"), "mcc"
             ].dropna()
-            if len(vals) == 0:
-                means.append(np.nan)
-                sds.append(np.nan)
-            else:
-                means.append(vals.mean())
-                sds.append(vals.std())
-            ns.append(len(vals))
-
+            means.append(vals.mean() if len(vals) else np.nan)
+            sds.append(vals.std()   if len(vals) else np.nan)
         means = np.array(means)
         sds   = np.array(sds)
         mask  = ~np.isnan(means)
 
         ax.plot(np.array(N_VALS)[mask], means[mask],
-                color=color, marker=marker, markersize=5,
-                linewidth=1.8, label=label, zorder=3)
+                color=color, marker=marker, markersize=4,
+                linewidth=1.5, label=label, zorder=3)
         ax.fill_between(np.array(N_VALS)[mask],
                         (means - sds)[mask], (means + sds)[mask],
                         color=color, alpha=0.15, zorder=2)
         ax.errorbar(np.array(N_VALS)[mask], means[mask], yerr=sds[mask],
-                    fmt="none", ecolor=color, elinewidth=0.9,
-                    capsize=4, capthick=0.9, zorder=4)
+                    fmt="none", ecolor=color, elinewidth=0.7,
+                    capsize=3, capthick=0.7, zorder=4)
 
-        for n, m, s in zip(np.array(N_VALS)[mask], means[mask], sds[mask]):
-            y_txt = (m + s + 0.055) if lbl_sign > 0 else (m - s - 0.018)
-            ax.text(n, y_txt, f"{m:.2f}",
-                    ha="center", va=lbl_va, fontsize=10,
-                    fontweight="bold", color=color)
+        for n, m_val, s in zip(np.array(N_VALS)[mask], means[mask], sds[mask]):
+            y_txt = (m_val + s + 0.05) if lbl_sign > 0 else (m_val - s - 0.015)
+            va    = "bottom" if lbl_sign > 0 else "top"
+            ax.text(n, y_txt, f"{m_val:.2f}", ha="center", va=va,
+                    fontsize=6, fontweight="bold", color=color)
 
-    ax.axhline(0.5, color="#4D9078", linewidth=1.6, linestyle="--",
-               label="Random baseline (0.5)", zorder=1)
-    ax.axvline(513, color="#4C72B0", linewidth=1.6, linestyle=":",
-               label="GSE182616 dataset (n=513)", zorder=1)
+    ax.axhline(0.5, color="#009E73", linewidth=1.0, linestyle="--",
+               label="Random baseline (MCC=0.5)", zorder=1)
+    ax.axvline(513, color="#0072B2", linewidth=1.0, linestyle=":",
+               label="GSE182616 (n=513)", zorder=1)
 
     ax.set_xlabel("Sample size (n)")
     ax.set_ylabel("MCC")
@@ -93,35 +84,23 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
     ax.set_ylim(0.15, 1.05)
     ax.set_xticks(N_VALS)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.1f}"))
-    ax.legend(frameon=False, loc="lower right")
+    ax.legend(frameon=False, loc="lower right", fontsize=7,
+              handlelength=1.3, labelspacing=0.3)
 
+    panel_label(ax, "A")
     return fig
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=os.path.join(FIGURES_DIR, "mcc_vs_n.pdf"))
-    parser.add_argument("--dpi", type=int, default=300)
+    parser.add_argument("--dpi", type=int, default=600)
     args = parser.parse_args()
-
     print("Loading data …")
     df = pd.read_csv(SUMMARY_CSV, low_memory=False)
-    configs_found = df.loc[df["config"].isin(CONFIGS), "config"].unique()
-    print(f"  n-sweep configs found: {sorted(configs_found)}")
-
+    print(f"  n-sweep configs found: {sorted(df.loc[df['config'].isin(CONFIGS), 'config'].unique())}")
     print("Building figure …")
-    fig = build_figure(df)
-
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved → {args.out}")
-
-    if args.out.endswith(".pdf"):
-        png_out = args.out.replace(".pdf", ".png")
-        fig.savefig(png_out, dpi=150, bbox_inches="tight")
-        print(f"Saved → {png_out}")
-
-    plt.close(fig)
+    save(build_figure(df), args.out, args.dpi)
 
 
 if __name__ == "__main__":

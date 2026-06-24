@@ -1,0 +1,46 @@
+#!/bin/bash
+#SBATCH --job-name=dof_null_fix
+#SBATCH --output=logs/dof_null_fix_%A_%a.out
+#SBATCH --error=logs/dof_null_fix_%A_%a.err
+#SBATCH --time=01:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=28672M
+#SBATCH --array=0-4
+# Partition set at submission: sbatch --partition=rome jobs/dof_null_missing.job
+#
+# Fix: dof_sweep.job null-graph tasks had CONFIGS[3] undefined (array only had
+# 3 elements). Tasks 1350-1399 ran with cfg="" and wrote no output.
+# This job re-runs those 50 tasks: config=n1026p328 (4th config), reps 0-49.
+# 5 array slots × 10 reps = 50 tasks.
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+CONFIG="n1026p328"
+N_REPS=50
+TASKS_PER_JOB=10
+
+mkdir -p "$HOME/NODIS/results/dof_sweep" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    REP=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $REP -ge $N_REPS ]] && break
+
+    OUT="$HOME/NODIS/results/dof_sweep/results_null_${CONFIG}_method_desparsified_null_rep$(printf '%03d' $REP).csv"
+    if [[ -f "$OUT" ]]; then
+        echo "[skip] null cfg=${CONFIG} rep=${REP} — already exists"
+        continue
+    fi
+
+    echo "[run] null cfg=${CONFIG} rep=${REP}"
+    python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+        --topology hub \
+        --config   "$CONFIG" \
+        --method   desparsified \
+        --rep      "$REP" \
+        --out      "$HOME/NODIS/results/dof_sweep/" \
+        --null-graph &
+done
+
+wait

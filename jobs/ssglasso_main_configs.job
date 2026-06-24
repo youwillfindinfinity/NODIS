@@ -1,0 +1,53 @@
+#!/bin/bash
+#SBATCH --job-name=ssglasso_main
+#SBATCH --output=logs/ssglasso_main_%A_%a.out
+#SBATCH --error=logs/ssglasso_main_%A_%a.err
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G                # ~2 GB/task for 4 parallel tasks
+#SBATCH --array=0-99            # 100 jobs × 4 tasks = 400 (2 configs × 4 topos × 50 reps)
+# Method: ssglasso on n100p50 and n237p78 (completing main comparison grid)
+# Grid:   2 configs × 4 topologies × 50 reps = 400 tasks
+#
+# Submit:
+#   sbatch --partition=rome jobs/ssglasso_main_configs.job
+
+NODIS_DIR="$HOME/NODIS"
+
+[[ -f "$NODIS_DIR/snellius_modules.sh" ]] && source "$NODIS_DIR/snellius_modules.sh"
+source "$NODIS_DIR/.venv/bin/activate"
+
+CONFIGS=("n100p50" "n237p78")
+TOPOS=("hub" "scale-free" "cluster" "random")
+N_REPS=50
+N_CONFIGS=2
+N_TOPOS=4
+TOTAL=$(( N_CONFIGS * N_TOPOS * N_REPS ))   # 400
+TASKS_PER_JOB=4
+
+mkdir -p "$NODIS_DIR/results/raw" "$NODIS_DIR/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    FLAT=$(( SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+    [[ $FLAT -ge $TOTAL ]] && break
+
+    CONFIG_IDX=$(( FLAT / (N_TOPOS * N_REPS) ))
+    REM1=$(( FLAT % (N_TOPOS * N_REPS) ))
+    TOPO_IDX=$(( REM1 / N_REPS ))
+    REP=$(( REM1 % N_REPS ))
+
+    CONFIG=${CONFIGS[$CONFIG_IDX]}
+    TOPO=${TOPOS[$TOPO_IDX]}
+
+    echo "[$FLAT] config=${CONFIG} topology=${TOPO} method=ssglasso rep=${REP}"
+
+    python "$NODIS_DIR/benchmarks/run_synthetic.py" \
+        --topology "$TOPO"   \
+        --config   "$CONFIG" \
+        --method   ssglasso  \
+        --rep      "$REP"    \
+        --out      "$NODIS_DIR/results/raw/" &
+done
+
+wait

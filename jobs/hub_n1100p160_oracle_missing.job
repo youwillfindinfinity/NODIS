@@ -1,0 +1,43 @@
+#!/bin/bash
+#SBATCH --job-name=hub1100_oracle_fix
+#SBATCH --output=logs/hub1100_oracle_fix_%A_%a.out
+#SBATCH --error=logs/hub1100_oracle_fix_%A_%a.err
+#SBATCH --time=05:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=32768M
+#SBATCH --partition=rome
+#SBATCH --array=0-1
+# Fix: hub_n1100p160_method_piglasso_oracle_n02 missing reps 040-049 (10 files).
+# 2 array slots × 5 reps = 10 tasks; REP_OFFSET=40.
+
+source "$HOME/NODIS/.venv/bin/activate"
+
+TOPO="hub"
+CONFIG="n1100p160"
+METHOD="piglasso_oracle_n02"
+TASKS_PER_JOB=5
+REP_OFFSET=40
+
+mkdir -p "$HOME/NODIS/results/raw" "$HOME/NODIS/logs"
+
+for LOCAL_IDX in $(seq 0 $((TASKS_PER_JOB - 1))); do
+    REP=$(( REP_OFFSET + SLURM_ARRAY_TASK_ID * TASKS_PER_JOB + LOCAL_IDX ))
+
+    OUT="$HOME/NODIS/results/raw/results_${TOPO}_${CONFIG}_method_${METHOD}_rep$(printf '%03d' $REP).csv"
+    if [[ -f "$OUT" ]]; then
+        echo "[skip] topo=${TOPO} cfg=${CONFIG} method=${METHOD} rep=${REP} — already exists"
+        continue
+    fi
+
+    echo "[run] topo=${TOPO} cfg=${CONFIG} method=${METHOD} rep=${REP}"
+    python "$HOME/NODIS/benchmarks/run_synthetic.py" \
+        --topology "$TOPO" \
+        --config   "$CONFIG" \
+        --method   "$METHOD" \
+        --rep      "$REP" \
+        --prior-weight 0.5 \
+        --out      "$HOME/NODIS/results/raw/" &
+done
+
+wait

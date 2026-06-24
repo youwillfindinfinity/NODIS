@@ -118,6 +118,28 @@ class GGMInferenceResult:
     adj_fdr: Optional[np.ndarray] = None
     fdr_alpha: Optional[float] = None
 
+    def validate_against_string(
+        self,
+        gene_names: list[str],
+        organism: int = 9606,
+        score_threshold: int = 400,
+        score_type: str = "combined",
+    ):
+        """Validate the FDR-controlled adjacency against STRING interactions.
+
+        Requires adj_fdr to be set (call get_adjacency() first).
+        """
+        if self.adj_fdr is None:
+            raise ValueError(
+                "adj_fdr is not set. Call DesparifiedGGM.get_adjacency() first."
+            )
+        from nodis.validate.string_validator import validate_against_string
+        return validate_against_string(
+            self.adj_fdr, gene_names,
+            organism=organism, score_threshold=score_threshold,
+            score_type=score_type,
+        )
+
 
 class DesparifiedGGM:
     """
