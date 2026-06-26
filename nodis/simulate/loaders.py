@@ -75,7 +75,7 @@ def load_dream5_insilico(
 
     # Read expression — avg format has gene names as column headers (no index column)
     expr = pd.read_csv(expr_file, sep="\t")
-    if expr.iloc[:, 0].dtype == object:
+    if not pd.api.types.is_numeric_dtype(expr.iloc[:, 0]):
         # First column contains gene names (official format with experiment index)
         expr = expr.set_index(expr.columns[0])
         expr = expr.T  # → (n_experiments, n_genes)
