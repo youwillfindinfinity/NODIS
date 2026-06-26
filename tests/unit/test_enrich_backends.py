@@ -111,6 +111,7 @@ def test_gprofiler_run_ora_empty_results_dict_returns_empty():
 # ── gseapy backend ────────────────────────────────────────────────────────────
 
 def test_gseapy_prerank_returns_dataframe():
+    pytest.importorskip("gseapy")
     from nodis.enrich.backends.gseapy_backend import run_prerank
     import pandas as pd
 
@@ -141,6 +142,7 @@ def test_gseapy_prerank_returns_dataframe():
 
 
 def test_gseapy_prerank_empty_series_returns_empty():
+    pytest.importorskip("gseapy")
     from nodis.enrich.backends.gseapy_backend import run_prerank
     import pandas as pd
 
@@ -153,6 +155,7 @@ def test_gseapy_prerank_empty_series_returns_empty():
 
 
 def test_gseapy_ora_returns_dataframe():
+    pytest.importorskip("gseapy")
     from nodis.enrich.backends.gseapy_backend import run_ora
 
     mock_result = MagicMock()
