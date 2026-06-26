@@ -40,9 +40,18 @@ from plot_style import (
 
 warnings.filterwarnings("ignore")
 
-METHODS_MAIN = ["desparsified", "glasso", "gglasso", "ssglasso", "piglasso_oracle_n02"]
-PALETTE      = METHOD_PALETTE
-LABELS       = METHOD_LABELS
+METHODS_MAIN   = ["desparsified", "glasso", "gglasso", "ssglasso", "piglasso_oracle_n02"]
+PALETTE        = METHOD_PALETTE
+LABELS         = METHOD_LABELS
+
+# Oracle method gets grey treatment as "upper bound" (not a fair comparator)
+ORACLE_METHOD  = "piglasso_oracle_n02"
+ORACLE_COLOR   = "#999999"   # grey
+ORACLE_LABEL   = "PIGLasso oracle (upper bound; prior from true adj.)"
+
+# Override palette for oracle in this script
+PALETTE = dict(METHOD_PALETTE)
+PALETTE[ORACLE_METHOD] = ORACLE_COLOR
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures")
@@ -309,14 +318,23 @@ def build_figure(df: pd.DataFrame) -> plt.Figure:
                     (ax_D, "D"), (ax_E, "E"), (ax_F, "F")]:
         panel_label(ax, ltr)
 
+    unsupervised = [m for m in METHODS_MAIN
+                    if m in syn_methods and m != ORACLE_METHOD]
     handles = [
         mpatches.Patch(facecolor=PALETTE.get(m, "#888"), edgecolor="none",
                        label=LABELS.get(m, m))
-        for m in METHODS_MAIN if m in syn_methods
+        for m in unsupervised
     ]
-    fig.legend(handles=handles, loc="upper center", ncol=len(handles),
-               frameon=False, fontsize=7, bbox_to_anchor=(0.5, 1.00),
-               handlelength=1.2, handleheight=0.8, columnspacing=1.5)
+    # Oracle gets a hatched grey patch with explicit upper-bound label
+    if ORACLE_METHOD in syn_methods:
+        handles.append(
+            mpatches.Patch(facecolor=ORACLE_COLOR, edgecolor="#666",
+                           hatch="////", linewidth=0.5,
+                           label=ORACLE_LABEL)
+        )
+    fig.legend(handles=handles, loc="upper center", ncol=min(len(handles), 5),
+               frameon=False, fontsize=6.5, bbox_to_anchor=(0.5, 1.01),
+               handlelength=1.4, handleheight=0.9, columnspacing=1.0)
     return fig
 
 

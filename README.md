@@ -10,7 +10,7 @@
   <a href="https://github.com/youwillfindinfinity/nodis/actions/workflows/ci.yml"><img src="https://github.com/youwillfindinfinity/nodis/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python"/></a>
-  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.1.0-green" alt="Version"/></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-1.0.0-green" alt="Version"/></a>
   <a href="https://doi.org/10.5281/zenodo.20452188"><img src="https://zenodo.org/badge/1187948242.svg" alt="DOI"/></a>
 </p>
 
@@ -29,12 +29,18 @@ NODIS is the **first Python-native tool** to deliver these guarantees without re
 - **De-sparsified nodewise Lasso** — asymptotically valid edge-level z-scores and p-values under the null hypothesis ω_ij = 0
 - **FDR control** — Benjamini–Hochberg and Benjamini–Yekutieli procedures via `scipy.stats.false_discovery_control`
 - **Confidence intervals** — asymptotic and ensemble-based CIs for precision matrix entries
-- **Nonparanormal transform** — rank-based shrinkage NPN matching `huge::huge.npn` (pure NumPy/SciPy, no R)
+- **Nonparanormal transform** — rank-based shrinkage NPN and SKEPTIC (Kendall τ) matching `huge::huge.npn` (pure NumPy/SciPy, no R)
 - **Synthetic data generator** — four network topologies (hub, scale-free, cluster, random) with guaranteed positive-definite precision matrices
 - **Benchmark suite** — parallel multi-method runner with AUPR, AUROC, F1, MCC, and SHD metrics against DREAM5 and SERGIO benchmarks
-- **Baseline estimators** — sklearn GraphicalLassoCV and GGLasso wrappers with a uniform API
-- **AnnData compatibility** — direct ingestion of `AnnData` objects for single-cell workflows
-- **CLI** — `nodis simulate / run / evaluate / enrich` via Click
+- **Baseline estimators** — sklearn GraphicalLassoCV, GGLasso, and PIGLasso wrappers with a uniform API
+- **Community detection** — Leiden, Louvain, greedy-modularity, and spectral algorithms with hub-gene permutation tests and network backbone extraction
+- **Differential testing** — edge-level two-sample Z-test (`desparsified_test`) and fused-GLasso for multi-condition networks
+- **Enrichment analysis** — topology-aware gene set enrichment via g:Profiler and GSEApy across RNA, protein, and post-transcriptional levels
+- **STRING and BioGRID priors** — build prior matrices from STRING confidence scores for use with PIGLasso
+- **AnnData compatibility** — direct ingestion of `AnnData` objects and pseudobulk aggregation for single-cell workflows
+- **HTML report generation** — automated per-run summary reports
+- **Method advisor** — preset-based guidance for selecting the appropriate estimator
+- **CLI** — `nodis simulate / run / evaluate / enrich / diff / validate / network / report` via Click
 
 ---
 
@@ -392,36 +398,58 @@ P-value:              p_ij  = 2(1 − Φ(|Z_ij|))
 ```
 nodis/
 ├── estimators/
-│   ├── desparsified.py     ← DesparifiedGGM (core estimator)
-│   ├── glasso.py           ← SklearnGLasso, GGLassoEstimator (baselines)
-│   ├── piglasso.py         ← PIGLassoEstimator (stability selection + prior)
-│   └── prior_utils.py      ← build_corr_prior, build_noisy_oracle_prior
+│   ├── desparsified.py       ← DesparifiedGGM (core estimator)
+│   ├── _reference_bnwsl.py   ← reference implementation for parity validation
+│   ├── glasso.py             ← SklearnGLasso, GGLassoEstimator (baselines)
+│   ├── piglasso.py           ← PIGLassoEstimator (stability selection + prior)
+│   ├── group_glasso.py       ← multi-condition group GLasso
+│   └── prior_utils.py        ← build_corr_prior, build_noisy_oracle_prior
 ├── inference/
-│   ├── fdr.py              ← BH/BY FDR control
-│   ├── confidence.py       ← asymptotic & ensemble confidence intervals
-│   ├── pvalues.py          ← p-value computation
-│   └── stars.py            ← StARS stability selection
+│   ├── fdr.py                ← BH/BY FDR control
+│   ├── confidence.py         ← asymptotic & ensemble confidence intervals
+│   ├── pvalues.py            ← p-value computation
+│   └── stars.py              ← StARS stability selection
 ├── preprocess/
-│   ├── npn.py              ← nonparanormal shrinkage transform
-│   └── anndata_compat.py   ← AnnData ingestion
+│   ├── npn.py                ← nonparanormal shrinkage and SKEPTIC transforms
+│   ├── anndata_compat.py     ← AnnData ingestion
+│   └── pseudobulk.py         ← pseudobulk aggregation for single-cell data
 ├── simulate/
-│   ├── generator.py        ← synthetic GGM data (4 topologies)
-│   └── loaders.py          ← DREAM5, SERGIO data loaders
+│   ├── generator.py          ← synthetic GGM data (4 topologies)
+│   └── loaders.py            ← DREAM5, SERGIO data loaders
 ├── benchmark/
-│   ├── runner.py           ← parallel multi-method benchmark runner
-│   └── evaluate.py         ← AUPR, AUROC, F1, MCC, SHD
+│   ├── runner.py             ← parallel multi-method benchmark runner
+│   ├── evaluate.py           ← AUPR, AUROC, F1, MCC, SHD
+│   └── diffusion_eval.py     ← network diffusion and knockout evaluation
+├── compare/
+│   └── differential.py       ← edge-level two-sample Z-test, fused GLasso
+├── network/
+│   └── topology.py           ← community detection, hub genes, backbone
+├── enrich/
+│   ├── __init__.py           ← from_result(), from_adjacency()
+│   ├── backends/             ← g:Profiler and GSEApy adapters
+│   ├── databases.py          ← biological level → gene set database mapping
+│   ├── extract.py            ← hub_genes, ranked_genes, community_gene_sets
+│   └── result.py             ← EnrichmentResult container
+├── priors/
+│   ├── string_prior.py       ← prior matrix from STRING confidence scores
+│   └── biogrid_prior.py      ← BioGRID prior (planned v0.3)
+├── validate/
+│   └── string_validator.py   ← STRING recall/precision validation
+├── report/
+│   └── generator.py          ← HTML report generation
 ├── visualise/
-│   └── plots.py            ← network and metric visualisation
-└── cli.py                  ← Click CLI (simulate/run/evaluate/plot)
+│   └── plots.py              ← network and metric visualisation
+├── advisor.py                ← preset-based method selection advisor
+└── cli.py                    ← Click CLI
 ```
 
 ---
 
 ## Benchmarks
 
-NODIS is validated against SILGGM (R), DREAM5 Network 1 (E. coli in silico), and SERGIO single-cell simulations. Parity tests target Pearson r > 0.99 between NODIS and SILGGM z-scores on matched synthetic replicates.
+NODIS is validated against DREAM5 Network 1 (E. coli in silico) and SERGIO single-cell simulations across four synthetic topologies (hub, scale-free, cluster, random). Parity between the `DesparifiedGGM` and the reference B_NW_SL implementation is verified internally without requiring R or SILGGM.
 
-Benchmark scripts are in `benchmarks/` and SLURM array jobs for HPC execution are in `jobs/`.
+Benchmark scripts are in `benchmarks/` and SLURM array jobs for HPC execution are in `jobs/`. See `REPRODUCE.md` for full reproduction instructions. Summary results are in `results/RESULTS.md`.
 
 ---
 
@@ -429,8 +457,8 @@ Benchmark scripts are in `benchmarks/` and SLURM array jobs for HPC execution ar
 
 ```bash
 pytest tests/ -v
-pytest tests/unit/          # unit tests (fast)
-pytest tests/integration/   # parity tests (requires R + SILGGM)
+pytest tests/unit/          # unit tests only (fast, no external dependencies)
+pytest tests/integration/   # integration tests (no R required)
 ```
 
 ---
@@ -449,8 +477,8 @@ All-time line contributions (`git log --all --numstat`, added + deleted):
 
 | Rank | Contributor | Total Lines | Added | Deleted | Share |
 |:----:|-------------|------------:|------:|--------:|------:|
-| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 275,992 | +170,333 | −105,659 | 99.8% |
-| 🥈 | Zoe Azra | 628 | +561 | −67 | 0.2% |
+| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,896 | +292,528 | −202,368 | 99.9% |
+| 🥈 | Zoe Azra | 628 | +561 | −67 | 0.1% |
 ---
 
 ## Authors

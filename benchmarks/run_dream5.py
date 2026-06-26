@@ -31,6 +31,7 @@ def main() -> None:
                         help="Number of genes to retain (by variance).")
     parser.add_argument("--method", default="desparsified",
                         choices=["desparsified", "glasso", "gglasso",
+                                 "ssglasso",
                                  "piglasso", "piglasso_corr", "piglasso_string"])
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--n-jobs", type=int, default=1,
@@ -91,6 +92,14 @@ def main() -> None:
         est.fit(X)
         adj = est.get_adjacency()
         scores = np.abs(est.precision_)
+
+    elif args.method == "ssglasso":
+        # SSGLasso = PIGLasso with prior_weight=0 (no-prior ablation)
+        from nodis.estimators.piglasso import PIGLassoEstimator
+        est = PIGLassoEstimator(n_jobs=args.n_jobs, prior_weight=0.0)
+        est.fit(X)
+        adj = est.get_adjacency()
+        scores = est.precision_
 
     elif args.method == "piglasso":
         from nodis.estimators.piglasso import PIGLassoEstimator

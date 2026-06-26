@@ -59,12 +59,10 @@ secrets.json
 .DS_Store
 
 # ── Results & outputs ───────────────────────────────────────────────────────
-# Local results (re-generatable from benchmarks)
-results/*
-!results/burns
-# Raw Snellius HPC outputs (167 MB+)
+# All benchmark outputs — regenerate with REPRODUCE.md
+results/
 results_snellius_raw/
-# Keep figures tracked (only 468 KB)
+# Keep figures tracked (only ~500 KB)
 # figures/ is intentionally NOT ignored
 
 # ── Data ─────────────────────────────────────────────────────────────────────

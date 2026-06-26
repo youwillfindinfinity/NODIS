@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH --job-name=dream5_ssglasso
+#SBATCH --output=logs/dream5_ssglasso_%j.out
+#SBATCH --error=logs/dream5_ssglasso_%j.err
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=28672M
+#SBATCH --time=06:00:00
+# SSGLasso (PIGLasso prior_weight=0) on DREAM5 Network 1 for p=200, 500, 1000.
+# Run all three in parallel — wall time dominated by p=1000 (~5h on rome).
+# sbatch --partition=rome jobs/dream5_ssglasso.job
+
+[[ -f "$HOME/NODIS/snellius_modules.sh" ]] && source "$HOME/NODIS/snellius_modules.sh"
+source "$HOME/NODIS/.venv/bin/activate"
+
+mkdir -p "$HOME/NODIS/results/dream5" "$HOME/NODIS/logs"
+
+for P in 200 500 1000; do
+    OUTFILE="$HOME/NODIS/results/dream5/dream5_net1_p${P}_method_ssglasso.csv"
+    if [[ -f "$OUTFILE" ]]; then
+        echo "Skipping (exists): $OUTFILE"
+    else
+        echo "Running SSGLasso p=${P} ..."
+        python "$HOME/NODIS/benchmarks/run_dream5.py" \
+            --data-dir "$HOME/NODIS/data/dream5" \
+            --network  1                           \
+            --p        "$P"                        \
+            --method   ssglasso                    \
+            --n-jobs   5                           \
+            --out      "$HOME/NODIS/results/dream5/" &
+    fi
+done
+
+wait
+echo "All SSGLasso DREAM5 jobs done."
