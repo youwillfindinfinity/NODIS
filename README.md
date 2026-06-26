@@ -390,6 +390,8 @@ P-value:              p_ij  = 2(1 − Φ(|Z_ij|))
 **References:**
 - van de Geer S, Bühlmann P, Ritov Y, Dezeure R (2014). *On asymptotically optimal confidence regions and tests for high-dimensional models.* Ann Statist 42(3): 1166–1202.
 - Zhang CH, Zhang SS (2014). *Confidence intervals for low dimensional parameters in high dimensional linear models.* J R Stat Soc B 76(1): 217–242.
+- Bumbuc RV, Barylli M, Blei ZA (2026). *PIGLasso: Prior-Informed Graphical Lasso for transcriptomics network inference* (v0.1.1). Zenodo. https://doi.org/10.5281/zenodo.20453217
+- Barylli M (2024). *Multi-Layer and Single Cell Network Models in Colorectal Cancer Subtype Analysis.* Master's thesis, Universiteit van Amsterdam, Amsterdam, The Netherlands. https://scripties.uba.uva.nl/search?id=record_54542
 
 ---
 
@@ -477,7 +479,7 @@ All-time line contributions (`git log --all --numstat`, added + deleted):
 
 | Rank | Contributor | Total Lines | Added | Deleted | Share |
 |:----:|-------------|------------:|------:|--------:|------:|
-| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,912 | +292,536 | −202,376 | 99.9% |
+| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,916 | +292,538 | −202,378 | 99.9% |
 | 🥈 | Zoe Azra | 628 | +561 | −67 | 0.1% |
 ---
 
