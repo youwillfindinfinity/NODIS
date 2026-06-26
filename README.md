@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python"/></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-1.0.0-green" alt="Version"/></a>
-  <a href="https://doi.org/10.5281/zenodo.20452188"><img src="https://zenodo.org/badge/1187948242.svg" alt="DOI"/></a>
+  <a href="https://doi.org/10.5281/zenodo.20452188"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20452188.svg" alt="DOI"/></a>
 </p>
 
 ---
@@ -477,7 +477,7 @@ All-time line contributions (`git log --all --numstat`, added + deleted):
 
 | Rank | Contributor | Total Lines | Added | Deleted | Share |
 |:----:|-------------|------------:|------:|--------:|------:|
-| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,908 | +292,534 | −202,374 | 99.9% |
+| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,912 | +292,536 | −202,376 | 99.9% |
 | 🥈 | Zoe Azra | 628 | +561 | −67 | 0.1% |
 ---
 
