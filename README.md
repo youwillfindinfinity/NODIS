@@ -479,7 +479,7 @@ All-time line contributions (`git log --all --numstat`, added + deleted):
 
 | Rank | Contributor | Total Lines | Added | Deleted | Share |
 |:----:|-------------|------------:|------:|--------:|------:|
-| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,916 | +292,538 | −202,378 | 99.9% |
+| 🥇 | [youwillfindinfinity](https://github.com/youwillfindinfinity) | 494,920 | +292,541 | −202,379 | 99.9% |
 | 🥈 | Zoe Azra | 628 | +561 | −67 | 0.1% |
 ---
 

@@ -79,7 +79,7 @@ def _line_panel(ax, df, metric, ylabel, title, log_y=False):
         )
     else:
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
-    ax.legend(loc="upper right" if not log_y else "lower right",
+    ax.legend(loc="lower left" if not log_y else "lower right",
               fontsize=6.5, handlelength=1.2, labelspacing=0.3)
 
 
